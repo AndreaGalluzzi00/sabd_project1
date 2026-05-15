@@ -1,0 +1,28 @@
+# Dati: mai committare
+data/
+*.tar.gz
+*.csv
+*.parquet
+results/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+.env.local
+
+# NiFi
+nifi/flows/*.xml.bak
+nifi/conf/

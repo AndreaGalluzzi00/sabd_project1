@@ -1,0 +1,41 @@
+services:
+  namenode:
+    image: bde2020/hadoop-namenode:${HADOOP_IMAGE_VERSION}
+    platform: ${PLATFORM}
+    container_name: namenode
+    hostname: namenode
+    restart: unless-stopped
+    ports:
+      - "9870:9870"   # Web UI HDFS
+      - "9000:9000"   # RPC
+    volumes:
+      - hdfs_namenode:/hadoop/dfs/name
+    environment:
+      - CLUSTER_NAME=${CLUSTER_NAME}
+    env_file:
+      - ./hadoop.env
+    networks: [sabd-net]
+
+  datanode:
+    image: bde2020/hadoop-datanode:${HADOOP_IMAGE_VERSION}
+    platform: ${PLATFORM}
+    container_name: datanode
+    hostname: datanode
+    restart: unless-stopped
+    volumes:
+      - hdfs_datanode:/hadoop/dfs/data
+    environment:
+      - SERVICE_PRECONDITION=namenode:9870
+    env_file:
+      - ./hadoop.env
+    depends_on:
+      - namenode
+    networks: [sabd-net]
+
+networks:
+  sabd-net:
+    driver: bridge
+
+volumes:
+  hdfs_namenode:
+  hdfs_datanode:
