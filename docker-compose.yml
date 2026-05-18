@@ -32,6 +32,23 @@ services:
       - namenode
     networks: [sabd-net]
 
+  nifi:
+    image: apache/nifi:${NIFI_IMAGE_VERSION}
+    platform: ${PLATFORM}
+    container_name: nifi
+    hostname: nifi
+    restart: unless-stopped
+    ports:
+      - "8443:8443"   # Web UI NiFi (HTTPS)
+    volumes:
+      - ./data:/opt/nifi/data
+    environment:
+      - SINGLE_USER_CREDENTIALS_USERNAME=${NIFI_USERNAME}
+      - SINGLE_USER_CREDENTIALS_PASSWORD=${NIFI_PASSWORD}
+    depends_on:
+      - namenode
+    networks: [sabd-net]
+
 networks:
   sabd-net:
     driver: bridge
