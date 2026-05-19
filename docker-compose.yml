@@ -32,6 +32,43 @@ services:
       - namenode
     networks: [sabd-net]
 
+  spark-master:
+    image: ${SPARK_IMAGE}:${SPARK_IMAGE_VERSION}
+    platform: ${PLATFORM}
+    container_name: spark-master
+    hostname: spark-master
+    restart: unless-stopped
+    command: /opt/spark/bin/spark-class org.apache.spark.deploy.master.Master
+    ports:
+      - "8080:8080"   # Web UI Spark Master
+      - "7077:7077"   # RPC Spark Master
+    volumes:
+      - ./spark/jobs:/opt/spark/jobs
+      - ./nifi/config:/opt/hadoop/conf
+    environment:
+      - HADOOP_CONF_DIR=/opt/hadoop/conf
+    depends_on:
+      - namenode
+    networks: [sabd-net]
+
+  spark-worker:
+    image: ${SPARK_IMAGE}:${SPARK_IMAGE_VERSION}
+    platform: ${PLATFORM}
+    container_name: spark-worker
+    hostname: spark-worker
+    restart: unless-stopped
+    command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
+    volumes:
+      - ./spark/jobs:/opt/spark/jobs
+      - ./nifi/config:/opt/hadoop/conf
+    environment:
+      - HADOOP_CONF_DIR=/opt/hadoop/conf
+      - SPARK_WORKER_MEMORY=1536m
+      - SPARK_WORKER_CORES=2
+    depends_on:
+      - spark-master
+    networks: [sabd-net]
+
   nifi:
     image: apache/nifi:${NIFI_IMAGE_VERSION}
     platform: ${PLATFORM}
