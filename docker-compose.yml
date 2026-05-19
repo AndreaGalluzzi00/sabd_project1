@@ -42,6 +42,7 @@ services:
       - "8443:8443"   # Web UI NiFi (HTTPS)
     volumes:
       - ./data:/opt/nifi/data
+      - ./nifi/config:/opt/nifi/nifi-config
     environment:
       - SINGLE_USER_CREDENTIALS_USERNAME=${NIFI_USERNAME}
       - SINGLE_USER_CREDENTIALS_PASSWORD=${NIFI_PASSWORD}
