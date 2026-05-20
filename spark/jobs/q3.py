@@ -59,6 +59,9 @@ delay_range = (
     .orderBy("OP_UNIQUE_CARRIER")
 )
 
+percentiles.cache()
+delay_range.cache()
+
 percentile_rows = percentiles.collect()
 range_rows = delay_range.collect()
 elapsed = time.time() - t0
