@@ -11,8 +11,9 @@ HDFS_OUTPUT_PERCENTILES = "hdfs://namenode:9000/sabd/results/q3/percentiles/"
 HDFS_OUTPUT_RANGE = "hdfs://namenode:9000/sabd/results/q3/delay_range/"
 LOCAL_OUT_PERCENTILES = "/opt/spark/jobs/results/q3_percentiles.csv"
 LOCAL_OUT_RANGE = "/opt/spark/jobs/results/q3_delay_range.csv"
+LOCAL_OUT = "/opt/spark/jobs/results"
 
-os.makedirs("/opt/spark/jobs/results", exist_ok=True)
+os.makedirs(LOCAL_OUT, exist_ok=True)
 
 spark = (
     SparkSession.builder

@@ -92,3 +92,4 @@ print(f"CSV su HDFS: {HDFS_OUTPUT}")
 print(f"\nTempo Q1 (DataFrame API): {elapsed:.2f}s")
 print(f"{'='*70}\n")
 
+spark.stop()

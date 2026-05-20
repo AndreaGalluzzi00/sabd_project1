@@ -82,4 +82,4 @@ print(f"CSV su HDFS: {HDFS_OUTPUT}")
 print(f"\nTempo Q1 (Spark SQL): {elapsed:.2f}s")
 print(f"{'='*70}\n")
 
-spark._sc._jvm.System.exit(0)
+spark.stop()
