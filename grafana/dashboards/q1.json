@@ -1,201 +1,201 @@
 {
   "id": null,
   "uid": "sabd-q1",
-  "title": "Q1 — Monthly Statistics: AA vs DL",
-  "tags": ["sabd", "q1"],
+  "title": "Q1 \u2014 Monthly Statistics: AA vs DL",
+  "tags": [
+    "sabd",
+    "q1"
+  ],
   "schemaVersion": 38,
-  "version": 1,
+  "version": 2,
   "refresh": false,
-  "time": {"from": "now-1h", "to": "now"},
-  "timepicker": {"hidden": true},
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "timepicker": {
+    "hidden": true
+  },
   "panels": [
     {
       "id": 1,
-      "title": "Avg Departure Delay by Month (minutes)",
-      "description": "Media del DEP_DELAY per mese, solo voli non cancellati.",
+      "title": "Avg Departure Delay by Month (min)",
+      "description": "Media DEP_DELAY mensile (solo voli non cancellati).",
       "type": "barchart",
-      "gridPos": {"h": 12, "w": 12, "x": 0, "y": 0},
-      "datasource": {"type": "redis-datasource", "uid": "redis"},
+      "gridPos": {
+        "h": 12,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "datasource": {
+        "type": "redis-datasource",
+        "uid": "redis"
+      },
       "fieldConfig": {
-        "defaults": {"unit": "short", "decimals": 2, "color": {"mode": "palette-classic"}},
+        "defaults": {
+          "unit": "short",
+          "decimals": 2,
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
         "overrides": []
       },
       "options": {
+        "xField": "Field",
         "orientation": "auto",
-        "xTickLabelRotation": 0,
         "fillOpacity": 80,
         "gradientMode": "none",
         "groupWidth": 0.7,
         "barWidth": 0.97,
-        "tooltip": {"mode": "multi", "sort": "none"},
-        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        }
       },
       "transformations": [
         {
-          "id": "convertFieldTypes",
+          "id": "reduce",
           "options": {
-            "conversions": [{"targetField": "value", "destinationType": "number"}]
+            "reducers": [
+              "last"
+            ],
+            "labelsToFields": false
           }
         },
         {
           "id": "joinByField",
-          "options": {"byField": "field", "mode": "outer"}
+          "options": {
+            "byField": "Field",
+            "mode": "outer"
+          }
         },
         {
           "id": "organize",
           "options": {
-            "renameByName": {"value 1": "AA", "value 2": "DL", "field": "Month"}
+            "renameByName": {
+              "Last": "AA",
+              "Last 1": "DL",
+              "Field": "Month"
+            }
           }
         }
       ],
       "targets": [
         {
-          "datasource": {"type": "redis-datasource", "uid": "redis"},
+          "datasource": {
+            "type": "redis-datasource",
+            "uid": "redis"
+          },
           "refId": "A",
           "command": "hgetall",
-          "keyName": "q1:viz:AA:avg_dep_delay",
-          "hide": false
+          "keyName": "q1:viz:AA:avg_dep_delay"
         },
         {
-          "datasource": {"type": "redis-datasource", "uid": "redis"},
+          "datasource": {
+            "type": "redis-datasource",
+            "uid": "redis"
+          },
           "refId": "B",
           "command": "hgetall",
-          "keyName": "q1:viz:DL:avg_dep_delay",
-          "hide": false
+          "keyName": "q1:viz:DL:avg_dep_delay"
         }
       ]
     },
     {
       "id": 2,
       "title": "Cancellation Rate by Month (%)",
-      "description": "Percentuale di voli cancellati sul totale per mese.",
+      "description": "Percentuale voli cancellati sul totale per mese.",
       "type": "barchart",
-      "gridPos": {"h": 12, "w": 12, "x": 12, "y": 0},
-      "datasource": {"type": "redis-datasource", "uid": "redis"},
+      "gridPos": {
+        "h": 12,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "datasource": {
+        "type": "redis-datasource",
+        "uid": "redis"
+      },
       "fieldConfig": {
-        "defaults": {"unit": "percent", "decimals": 2, "color": {"mode": "palette-classic"}},
+        "defaults": {
+          "unit": "percent",
+          "decimals": 2,
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
         "overrides": []
       },
       "options": {
+        "xField": "Field",
         "orientation": "auto",
-        "xTickLabelRotation": 0,
         "fillOpacity": 80,
         "gradientMode": "none",
         "groupWidth": 0.7,
         "barWidth": 0.97,
-        "tooltip": {"mode": "multi", "sort": "none"},
-        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        }
       },
       "transformations": [
         {
-          "id": "convertFieldTypes",
+          "id": "reduce",
           "options": {
-            "conversions": [{"targetField": "value", "destinationType": "number"}]
+            "reducers": [
+              "last"
+            ],
+            "labelsToFields": false
           }
         },
         {
           "id": "joinByField",
-          "options": {"byField": "field", "mode": "outer"}
+          "options": {
+            "byField": "Field",
+            "mode": "outer"
+          }
         },
         {
           "id": "organize",
           "options": {
-            "renameByName": {"value 1": "AA", "value 2": "DL", "field": "Month"}
+            "renameByName": {
+              "Last": "AA",
+              "Last 1": "DL",
+              "Field": "Month"
+            }
           }
         }
       ],
       "targets": [
         {
-          "datasource": {"type": "redis-datasource", "uid": "redis"},
+          "datasource": {
+            "type": "redis-datasource",
+            "uid": "redis"
+          },
           "refId": "A",
           "command": "hgetall",
-          "keyName": "q1:viz:AA:cancellation_rate",
-          "hide": false
+          "keyName": "q1:viz:AA:cancellation_rate"
         },
         {
-          "datasource": {"type": "redis-datasource", "uid": "redis"},
+          "datasource": {
+            "type": "redis-datasource",
+            "uid": "redis"
+          },
           "refId": "B",
           "command": "hgetall",
-          "keyName": "q1:viz:DL:cancellation_rate",
-          "hide": false
-        }
-      ]
-    },
-    {
-      "id": 3,
-      "title": "Detailed Monthly Stats — AA",
-      "type": "table",
-      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 12},
-      "datasource": {"type": "redis-datasource", "uid": "redis"},
-      "fieldConfig": {"defaults": {}, "overrides": []},
-      "options": {"showHeader": true},
-      "targets": [
-        {
-          "datasource": {"type": "redis-datasource", "uid": "redis"},
-          "refId": "A",
-          "command": "hgetall",
-          "keyName": "q1:AA:2025:1",
-          "hide": false
-        },
-        {
-          "datasource": {"type": "redis-datasource", "uid": "redis"},
-          "refId": "B",
-          "command": "hgetall",
-          "keyName": "q1:AA:2025:2",
-          "hide": false
-        },
-        {
-          "datasource": {"type": "redis-datasource", "uid": "redis"},
-          "refId": "C",
-          "command": "hgetall",
-          "keyName": "q1:AA:2025:3",
-          "hide": false
-        },
-        {
-          "datasource": {"type": "redis-datasource", "uid": "redis"},
-          "refId": "D",
-          "command": "hgetall",
-          "keyName": "q1:AA:2025:4",
-          "hide": false
-        }
-      ]
-    },
-    {
-      "id": 4,
-      "title": "Detailed Monthly Stats — DL",
-      "type": "table",
-      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 12},
-      "datasource": {"type": "redis-datasource", "uid": "redis"},
-      "fieldConfig": {"defaults": {}, "overrides": []},
-      "options": {"showHeader": true},
-      "targets": [
-        {
-          "datasource": {"type": "redis-datasource", "uid": "redis"},
-          "refId": "A",
-          "command": "hgetall",
-          "keyName": "q1:DL:2025:1",
-          "hide": false
-        },
-        {
-          "datasource": {"type": "redis-datasource", "uid": "redis"},
-          "refId": "B",
-          "command": "hgetall",
-          "keyName": "q1:DL:2025:2",
-          "hide": false
-        },
-        {
-          "datasource": {"type": "redis-datasource", "uid": "redis"},
-          "refId": "C",
-          "command": "hgetall",
-          "keyName": "q1:DL:2025:3",
-          "hide": false
-        },
-        {
-          "datasource": {"type": "redis-datasource", "uid": "redis"},
-          "refId": "D",
-          "command": "hgetall",
-          "keyName": "q1:DL:2025:4",
-          "hide": false
+          "keyName": "q1:viz:DL:cancellation_rate"
         }
       ]
     }

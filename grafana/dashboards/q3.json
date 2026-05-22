@@ -1,232 +1,525 @@
 {
   "id": null,
   "uid": "sabd-q3",
-  "title": "Q3 — DEP_DELAY Percentiles by Hour (AA / DL / UA / WN)",
-  "tags": ["sabd", "q3"],
+  "title": "Q3 \u2014 DEP_DELAY Percentiles by Hour",
+  "tags": [
+    "sabd",
+    "q3"
+  ],
   "schemaVersion": 38,
-  "version": 1,
+  "version": 2,
   "refresh": false,
-  "time": {"from": "now-1h", "to": "now"},
-  "timepicker": {"hidden": true},
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "timepicker": {
+    "hidden": true
+  },
   "panels": [
     {
       "id": 1,
-      "title": "AA — Departure Delay Percentiles by Hour",
-      "description": "p25 / p50 / p75 / p90 del DEP_DELAY per American Airlines, aggregati per fascia oraria (CRS_DEP_TIME).",
+      "title": "AA \u2014 DEP_DELAY Percentiles by Hour",
+      "description": "p25/p50/p75/p90 di DEP_DELAY per fascia oraria \u2014 AA.",
       "type": "barchart",
-      "gridPos": {"h": 12, "w": 12, "x": 0, "y": 0},
-      "datasource": {"type": "redis-datasource", "uid": "redis"},
+      "gridPos": {
+        "h": 12,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "datasource": {
+        "type": "redis-datasource",
+        "uid": "redis"
+      },
       "fieldConfig": {
-        "defaults": {"unit": "short", "decimals": 1, "color": {"mode": "palette-classic"}},
+        "defaults": {
+          "unit": "short",
+          "decimals": 2,
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
         "overrides": []
       },
       "options": {
+        "xField": "Field",
         "orientation": "auto",
-        "xTickLabelRotation": 0,
-        "fillOpacity": 60,
+        "fillOpacity": 80,
         "gradientMode": "none",
         "groupWidth": 0.7,
         "barWidth": 0.97,
-        "tooltip": {"mode": "multi", "sort": "none"},
-        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        }
       },
       "transformations": [
         {
-          "id": "convertFieldTypes",
+          "id": "reduce",
           "options": {
-            "conversions": [{"targetField": "value", "destinationType": "number"}]
+            "reducers": [
+              "last"
+            ],
+            "labelsToFields": false
           }
         },
         {
           "id": "joinByField",
-          "options": {"byField": "field", "mode": "outer"}
+          "options": {
+            "byField": "Field",
+            "mode": "outer"
+          }
         },
         {
           "id": "organize",
           "options": {
             "renameByName": {
-              "value 1": "p25",
-              "value 2": "p50",
-              "value 3": "p75",
-              "value 4": "p90",
-              "field": "Hour"
+              "Last": "p25",
+              "Last 1": "p50",
+              "Last 2": "p75",
+              "Last 3": "p90",
+              "Field": "Hour"
             }
           }
         }
       ],
       "targets": [
         {
-          "datasource": {"type": "redis-datasource", "uid": "redis"},
+          "datasource": {
+            "type": "redis-datasource",
+            "uid": "redis"
+          },
           "refId": "A",
           "command": "hgetall",
-          "keyName": "q3:viz:AA:p25",
-          "hide": false
+          "keyName": "q3:viz:AA:p25"
         },
         {
-          "datasource": {"type": "redis-datasource", "uid": "redis"},
+          "datasource": {
+            "type": "redis-datasource",
+            "uid": "redis"
+          },
           "refId": "B",
           "command": "hgetall",
-          "keyName": "q3:viz:AA:p50",
-          "hide": false
+          "keyName": "q3:viz:AA:p50"
         },
         {
-          "datasource": {"type": "redis-datasource", "uid": "redis"},
+          "datasource": {
+            "type": "redis-datasource",
+            "uid": "redis"
+          },
           "refId": "C",
           "command": "hgetall",
-          "keyName": "q3:viz:AA:p75",
-          "hide": false
+          "keyName": "q3:viz:AA:p75"
         },
         {
-          "datasource": {"type": "redis-datasource", "uid": "redis"},
+          "datasource": {
+            "type": "redis-datasource",
+            "uid": "redis"
+          },
           "refId": "D",
           "command": "hgetall",
-          "keyName": "q3:viz:AA:p90",
-          "hide": false
+          "keyName": "q3:viz:AA:p90"
         }
       ]
     },
     {
       "id": 2,
-      "title": "DL — Departure Delay Percentiles by Hour",
-      "description": "p25 / p50 / p75 / p90 del DEP_DELAY per Delta Airlines, aggregati per fascia oraria.",
+      "title": "DL \u2014 DEP_DELAY Percentiles by Hour",
+      "description": "p25/p50/p75/p90 di DEP_DELAY per fascia oraria \u2014 DL.",
       "type": "barchart",
-      "gridPos": {"h": 12, "w": 12, "x": 12, "y": 0},
-      "datasource": {"type": "redis-datasource", "uid": "redis"},
+      "gridPos": {
+        "h": 12,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "datasource": {
+        "type": "redis-datasource",
+        "uid": "redis"
+      },
       "fieldConfig": {
-        "defaults": {"unit": "short", "decimals": 1, "color": {"mode": "palette-classic"}},
+        "defaults": {
+          "unit": "short",
+          "decimals": 2,
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
         "overrides": []
       },
       "options": {
+        "xField": "Field",
         "orientation": "auto",
-        "xTickLabelRotation": 0,
-        "fillOpacity": 60,
+        "fillOpacity": 80,
         "gradientMode": "none",
         "groupWidth": 0.7,
         "barWidth": 0.97,
-        "tooltip": {"mode": "multi", "sort": "none"},
-        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        }
       },
       "transformations": [
         {
-          "id": "convertFieldTypes",
-          "options": {"conversions": [{"targetField": "value", "destinationType": "number"}]}
+          "id": "reduce",
+          "options": {
+            "reducers": [
+              "last"
+            ],
+            "labelsToFields": false
+          }
         },
-        {"id": "joinByField", "options": {"byField": "field", "mode": "outer"}},
+        {
+          "id": "joinByField",
+          "options": {
+            "byField": "Field",
+            "mode": "outer"
+          }
+        },
         {
           "id": "organize",
           "options": {
             "renameByName": {
-              "value 1": "p25", "value 2": "p50", "value 3": "p75", "value 4": "p90", "field": "Hour"
+              "Last": "p25",
+              "Last 1": "p50",
+              "Last 2": "p75",
+              "Last 3": "p90",
+              "Field": "Hour"
             }
           }
         }
       ],
       "targets": [
-        {"datasource": {"type": "redis-datasource", "uid": "redis"}, "refId": "A", "command": "hgetall", "keyName": "q3:viz:DL:p25"},
-        {"datasource": {"type": "redis-datasource", "uid": "redis"}, "refId": "B", "command": "hgetall", "keyName": "q3:viz:DL:p50"},
-        {"datasource": {"type": "redis-datasource", "uid": "redis"}, "refId": "C", "command": "hgetall", "keyName": "q3:viz:DL:p75"},
-        {"datasource": {"type": "redis-datasource", "uid": "redis"}, "refId": "D", "command": "hgetall", "keyName": "q3:viz:DL:p90"}
+        {
+          "datasource": {
+            "type": "redis-datasource",
+            "uid": "redis"
+          },
+          "refId": "A",
+          "command": "hgetall",
+          "keyName": "q3:viz:DL:p25"
+        },
+        {
+          "datasource": {
+            "type": "redis-datasource",
+            "uid": "redis"
+          },
+          "refId": "B",
+          "command": "hgetall",
+          "keyName": "q3:viz:DL:p50"
+        },
+        {
+          "datasource": {
+            "type": "redis-datasource",
+            "uid": "redis"
+          },
+          "refId": "C",
+          "command": "hgetall",
+          "keyName": "q3:viz:DL:p75"
+        },
+        {
+          "datasource": {
+            "type": "redis-datasource",
+            "uid": "redis"
+          },
+          "refId": "D",
+          "command": "hgetall",
+          "keyName": "q3:viz:DL:p90"
+        }
       ]
     },
     {
       "id": 3,
-      "title": "UA — Departure Delay Percentiles by Hour",
-      "description": "p25 / p50 / p75 / p90 del DEP_DELAY per United Airlines, aggregati per fascia oraria.",
+      "title": "UA \u2014 DEP_DELAY Percentiles by Hour",
+      "description": "p25/p50/p75/p90 di DEP_DELAY per fascia oraria \u2014 UA.",
       "type": "barchart",
-      "gridPos": {"h": 12, "w": 12, "x": 0, "y": 12},
-      "datasource": {"type": "redis-datasource", "uid": "redis"},
+      "gridPos": {
+        "h": 12,
+        "w": 12,
+        "x": 0,
+        "y": 12
+      },
+      "datasource": {
+        "type": "redis-datasource",
+        "uid": "redis"
+      },
       "fieldConfig": {
-        "defaults": {"unit": "short", "decimals": 1, "color": {"mode": "palette-classic"}},
+        "defaults": {
+          "unit": "short",
+          "decimals": 2,
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
         "overrides": []
       },
       "options": {
+        "xField": "Field",
         "orientation": "auto",
-        "xTickLabelRotation": 0,
-        "fillOpacity": 60,
+        "fillOpacity": 80,
         "gradientMode": "none",
         "groupWidth": 0.7,
         "barWidth": 0.97,
-        "tooltip": {"mode": "multi", "sort": "none"},
-        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        }
       },
       "transformations": [
         {
-          "id": "convertFieldTypes",
-          "options": {"conversions": [{"targetField": "value", "destinationType": "number"}]}
+          "id": "reduce",
+          "options": {
+            "reducers": [
+              "last"
+            ],
+            "labelsToFields": false
+          }
         },
-        {"id": "joinByField", "options": {"byField": "field", "mode": "outer"}},
+        {
+          "id": "joinByField",
+          "options": {
+            "byField": "Field",
+            "mode": "outer"
+          }
+        },
         {
           "id": "organize",
           "options": {
             "renameByName": {
-              "value 1": "p25", "value 2": "p50", "value 3": "p75", "value 4": "p90", "field": "Hour"
+              "Last": "p25",
+              "Last 1": "p50",
+              "Last 2": "p75",
+              "Last 3": "p90",
+              "Field": "Hour"
             }
           }
         }
       ],
       "targets": [
-        {"datasource": {"type": "redis-datasource", "uid": "redis"}, "refId": "A", "command": "hgetall", "keyName": "q3:viz:UA:p25"},
-        {"datasource": {"type": "redis-datasource", "uid": "redis"}, "refId": "B", "command": "hgetall", "keyName": "q3:viz:UA:p50"},
-        {"datasource": {"type": "redis-datasource", "uid": "redis"}, "refId": "C", "command": "hgetall", "keyName": "q3:viz:UA:p75"},
-        {"datasource": {"type": "redis-datasource", "uid": "redis"}, "refId": "D", "command": "hgetall", "keyName": "q3:viz:UA:p90"}
+        {
+          "datasource": {
+            "type": "redis-datasource",
+            "uid": "redis"
+          },
+          "refId": "A",
+          "command": "hgetall",
+          "keyName": "q3:viz:UA:p25"
+        },
+        {
+          "datasource": {
+            "type": "redis-datasource",
+            "uid": "redis"
+          },
+          "refId": "B",
+          "command": "hgetall",
+          "keyName": "q3:viz:UA:p50"
+        },
+        {
+          "datasource": {
+            "type": "redis-datasource",
+            "uid": "redis"
+          },
+          "refId": "C",
+          "command": "hgetall",
+          "keyName": "q3:viz:UA:p75"
+        },
+        {
+          "datasource": {
+            "type": "redis-datasource",
+            "uid": "redis"
+          },
+          "refId": "D",
+          "command": "hgetall",
+          "keyName": "q3:viz:UA:p90"
+        }
       ]
     },
     {
       "id": 4,
-      "title": "WN — Departure Delay Percentiles by Hour",
-      "description": "p25 / p50 / p75 / p90 del DEP_DELAY per Southwest Airlines, aggregati per fascia oraria.",
+      "title": "WN \u2014 DEP_DELAY Percentiles by Hour",
+      "description": "p25/p50/p75/p90 di DEP_DELAY per fascia oraria \u2014 WN.",
       "type": "barchart",
-      "gridPos": {"h": 12, "w": 12, "x": 12, "y": 12},
-      "datasource": {"type": "redis-datasource", "uid": "redis"},
+      "gridPos": {
+        "h": 12,
+        "w": 12,
+        "x": 12,
+        "y": 12
+      },
+      "datasource": {
+        "type": "redis-datasource",
+        "uid": "redis"
+      },
       "fieldConfig": {
-        "defaults": {"unit": "short", "decimals": 1, "color": {"mode": "palette-classic"}},
+        "defaults": {
+          "unit": "short",
+          "decimals": 2,
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
         "overrides": []
       },
       "options": {
+        "xField": "Field",
         "orientation": "auto",
-        "xTickLabelRotation": 0,
-        "fillOpacity": 60,
+        "fillOpacity": 80,
         "gradientMode": "none",
         "groupWidth": 0.7,
         "barWidth": 0.97,
-        "tooltip": {"mode": "multi", "sort": "none"},
-        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        }
       },
       "transformations": [
         {
-          "id": "convertFieldTypes",
-          "options": {"conversions": [{"targetField": "value", "destinationType": "number"}]}
+          "id": "reduce",
+          "options": {
+            "reducers": [
+              "last"
+            ],
+            "labelsToFields": false
+          }
         },
-        {"id": "joinByField", "options": {"byField": "field", "mode": "outer"}},
+        {
+          "id": "joinByField",
+          "options": {
+            "byField": "Field",
+            "mode": "outer"
+          }
+        },
         {
           "id": "organize",
           "options": {
             "renameByName": {
-              "value 1": "p25", "value 2": "p50", "value 3": "p75", "value 4": "p90", "field": "Hour"
+              "Last": "p25",
+              "Last 1": "p50",
+              "Last 2": "p75",
+              "Last 3": "p90",
+              "Field": "Hour"
             }
           }
         }
       ],
       "targets": [
-        {"datasource": {"type": "redis-datasource", "uid": "redis"}, "refId": "A", "command": "hgetall", "keyName": "q3:viz:WN:p25"},
-        {"datasource": {"type": "redis-datasource", "uid": "redis"}, "refId": "B", "command": "hgetall", "keyName": "q3:viz:WN:p50"},
-        {"datasource": {"type": "redis-datasource", "uid": "redis"}, "refId": "C", "command": "hgetall", "keyName": "q3:viz:WN:p75"},
-        {"datasource": {"type": "redis-datasource", "uid": "redis"}, "refId": "D", "command": "hgetall", "keyName": "q3:viz:WN:p90"}
+        {
+          "datasource": {
+            "type": "redis-datasource",
+            "uid": "redis"
+          },
+          "refId": "A",
+          "command": "hgetall",
+          "keyName": "q3:viz:WN:p25"
+        },
+        {
+          "datasource": {
+            "type": "redis-datasource",
+            "uid": "redis"
+          },
+          "refId": "B",
+          "command": "hgetall",
+          "keyName": "q3:viz:WN:p50"
+        },
+        {
+          "datasource": {
+            "type": "redis-datasource",
+            "uid": "redis"
+          },
+          "refId": "C",
+          "command": "hgetall",
+          "keyName": "q3:viz:WN:p75"
+        },
+        {
+          "datasource": {
+            "type": "redis-datasource",
+            "uid": "redis"
+          },
+          "refId": "D",
+          "command": "hgetall",
+          "keyName": "q3:viz:WN:p90"
+        }
       ]
     },
     {
       "id": 5,
       "title": "Min / Max DEP_DELAY per Carrier",
       "type": "table",
-      "gridPos": {"h": 6, "w": 24, "x": 0, "y": 24},
-      "datasource": {"type": "redis-datasource", "uid": "redis"},
-      "fieldConfig": {"defaults": {}, "overrides": []},
-      "options": {"showHeader": true},
+      "gridPos": {
+        "h": 6,
+        "w": 24,
+        "x": 0,
+        "y": 24
+      },
+      "datasource": {
+        "type": "redis-datasource",
+        "uid": "redis"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true
+      },
+      "transformations": [],
       "targets": [
-        {"datasource": {"type": "redis-datasource", "uid": "redis"}, "refId": "AA", "command": "hgetall", "keyName": "q3:range:AA"},
-        {"datasource": {"type": "redis-datasource", "uid": "redis"}, "refId": "DL", "command": "hgetall", "keyName": "q3:range:DL"},
-        {"datasource": {"type": "redis-datasource", "uid": "redis"}, "refId": "UA", "command": "hgetall", "keyName": "q3:range:UA"},
-        {"datasource": {"type": "redis-datasource", "uid": "redis"}, "refId": "WN", "command": "hgetall", "keyName": "q3:range:WN"}
+        {
+          "datasource": {
+            "type": "redis-datasource",
+            "uid": "redis"
+          },
+          "refId": "AA",
+          "command": "hgetall",
+          "keyName": "q3:range:AA"
+        },
+        {
+          "datasource": {
+            "type": "redis-datasource",
+            "uid": "redis"
+          },
+          "refId": "DL",
+          "command": "hgetall",
+          "keyName": "q3:range:DL"
+        },
+        {
+          "datasource": {
+            "type": "redis-datasource",
+            "uid": "redis"
+          },
+          "refId": "UA",
+          "command": "hgetall",
+          "keyName": "q3:range:UA"
+        },
+        {
+          "datasource": {
+            "type": "redis-datasource",
+            "uid": "redis"
+          },
+          "refId": "WN",
+          "command": "hgetall",
+          "keyName": "q3:range:WN"
+        }
       ]
     }
   ]

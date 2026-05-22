@@ -241,6 +241,9 @@ def export_clustering(r: redis.Redis) -> int:
     for metric, mapping in viz.items():
         r.delete(f"clustering:viz:{metric}")
         r.hset(f"clustering:viz:{metric}", mapping=mapping)
+        # ZADD per Grafana bar chart: score = valore metrica (numerico), member = carrier
+        r.delete(f"clustering:zset:{metric}")
+        r.zadd(f"clustering:zset:{metric}", {c: float(v) for c, v in mapping.items()})
 
     k = max(int(v) for v in assignments.values()) + 1
     r.hset("clustering:meta", mapping={"k": k, "n_carriers": len(rows)})
