@@ -9,7 +9,7 @@ from pyspark.sql import SparkSession
 from pyspark.sql.functions import (
     col, avg, min as spark_min, max as spark_max,
     count, sum as spark_sum, when, round as spark_round,
-    coalesce, lit, desc,
+    coalesce, lit, desc, floor, expr,
 )
 
 SPARK_MASTER = os.getenv("SPARK_MASTER", "local[2]")
@@ -140,6 +140,89 @@ diff_q2 = q2_df.subtract(q2_sql).count() + q2_sql.subtract(q2_df).count()
 print(f"\nQ2 — Righe diverse tra DF e SQL: {diff_q2}  {'OK' if diff_q2 == 0 else 'DIFFERENZE TROVATE'}")
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Q3
+# ─────────────────────────────────────────────────────────────────────────────
+print("\n" + "="*70)
+print("Q3 — DataFrame API")
+print("="*70)
+t0 = time.time()
+df_q3 = (
+    df.filter(
+        (col("OP_UNIQUE_CARRIER").isin("AA", "DL", "UA", "WN")) &
+        (col("CANCELLED") == 0)
+    )
+    .withColumn("hour", floor(col("CRS_DEP_TIME") / 100))
+)
+q3_percentiles_df = (
+    df_q3.groupBy("OP_UNIQUE_CARRIER", "hour")
+    .agg(
+        expr("percentile_approx(DEP_DELAY, 0.25)").alias("p25"),
+        expr("percentile_approx(DEP_DELAY, 0.50)").alias("p50"),
+        expr("percentile_approx(DEP_DELAY, 0.75)").alias("p75"),
+        expr("percentile_approx(DEP_DELAY, 0.90)").alias("p90"),
+    )
+    .orderBy("OP_UNIQUE_CARRIER", "hour")
+)
+q3_range_df = (
+    df_q3.groupBy("OP_UNIQUE_CARRIER")
+    .agg(
+        spark_min("DEP_DELAY").alias("min_delay"),
+        spark_max("DEP_DELAY").alias("max_delay"),
+    )
+    .orderBy("OP_UNIQUE_CARRIER")
+)
+q3_percentiles_df.cache()
+q3_range_df.cache()
+q3_percentiles_df.collect()
+q3_range_df.collect()
+t3_df = time.time() - t0
+q3_percentiles_df.show(100, truncate=False)
+q3_range_df.show(truncate=False)
+
+print("\n" + "="*70)
+print("Q3 — Spark SQL")
+print("="*70)
+t0 = time.time()
+q3_percentiles_sql = spark.sql("""
+    SELECT
+        OP_UNIQUE_CARRIER,
+        FLOOR(CRS_DEP_TIME / 100) AS hour,
+        percentile_approx(DEP_DELAY, 0.25) AS p25,
+        percentile_approx(DEP_DELAY, 0.50) AS p50,
+        percentile_approx(DEP_DELAY, 0.75) AS p75,
+        percentile_approx(DEP_DELAY, 0.90) AS p90
+    FROM flights
+    WHERE OP_UNIQUE_CARRIER IN ('AA', 'DL', 'UA', 'WN')
+      AND CANCELLED = 0
+    GROUP BY OP_UNIQUE_CARRIER, FLOOR(CRS_DEP_TIME / 100)
+    ORDER BY OP_UNIQUE_CARRIER, hour
+""")
+q3_range_sql = spark.sql("""
+    SELECT
+        OP_UNIQUE_CARRIER,
+        MIN(DEP_DELAY) AS min_delay,
+        MAX(DEP_DELAY) AS max_delay
+    FROM flights
+    WHERE OP_UNIQUE_CARRIER IN ('AA', 'DL', 'UA', 'WN')
+      AND CANCELLED = 0
+    GROUP BY OP_UNIQUE_CARRIER
+    ORDER BY OP_UNIQUE_CARRIER
+""")
+q3_percentiles_sql.cache()
+q3_range_sql.cache()
+q3_percentiles_sql.collect()
+q3_range_sql.collect()
+t3_sql = time.time() - t0
+q3_percentiles_sql.show(100, truncate=False)
+q3_range_sql.show(truncate=False)
+
+# Confronto risultati Q3
+diff_q3_perc = q3_percentiles_df.subtract(q3_percentiles_sql).count() + q3_percentiles_sql.subtract(q3_percentiles_df).count()
+diff_q3_range = q3_range_df.subtract(q3_range_sql).count() + q3_range_sql.subtract(q3_range_df).count()
+print(f"\nQ3 — Righe diverse (percentili) tra DF e SQL: {diff_q3_perc}  {'OK' if diff_q3_perc == 0 else 'DIFFERENZE TROVATE'}")
+print(f"Q3 — Righe diverse (min/max) tra DF e SQL:    {diff_q3_range}  {'OK' if diff_q3_range == 0 else 'DIFFERENZE TROVATE'}")
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Riepilogo tempi
 # ─────────────────────────────────────────────────────────────────────────────
 print("\n" + "="*70)
@@ -149,6 +232,7 @@ print(f"{'Query':<10} {'DataFrame API':>20} {'Spark SQL':>20} {'Differenza':>20}
 print("-"*70)
 print(f"{'Q1':<10} {t1_df:>17.2f}s   {t1_sql:>17.2f}s   {t1_sql - t1_df:>+18.2f}s")
 print(f"{'Q2':<10} {t2_df:>17.2f}s   {t2_sql:>17.2f}s   {t2_sql - t2_df:>+18.2f}s")
+print(f"{'Q3':<10} {t3_df:>17.2f}s   {t3_sql:>17.2f}s   {t3_sql - t3_df:>+18.2f}s")
 print("="*70 + "\n")
 
 spark._sc._jvm.System.exit(0)

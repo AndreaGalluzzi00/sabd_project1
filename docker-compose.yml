@@ -87,6 +87,38 @@ services:
       - namenode
     networks: [sabd-net]
 
+  redis:
+    image: redis:7.2-alpine
+    platform: ${PLATFORM}
+    container_name: redis
+    hostname: redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"   # Redis
+    networks: [sabd-net]
+
+  grafana:
+    image: grafana/grafana-oss:10.4.2
+    platform: ${PLATFORM}
+    container_name: grafana
+    hostname: grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"   # Web UI Grafana
+    environment:
+      - GF_INSTALL_PLUGINS=redis-datasource
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH=/etc/grafana/dashboards/q1.json
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./grafana/dashboards:/etc/grafana/dashboards
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - redis
+    networks: [sabd-net]
+
 networks:
   sabd-net:
     driver: bridge
@@ -94,3 +126,4 @@ networks:
 volumes:
   hdfs_namenode:
   hdfs_datanode:
+  grafana_data:

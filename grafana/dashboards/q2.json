@@ -1,0 +1,159 @@
+{
+  "id": null,
+  "uid": "sabd-q2",
+  "title": "Q2 — Top 10 Carriers by Arrival Delay",
+  "tags": ["sabd", "q2"],
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": false,
+  "time": {"from": "now-1h", "to": "now"},
+  "timepicker": {"hidden": true},
+  "panels": [
+    {
+      "id": 1,
+      "title": "Avg Arrival Delay — Top 10 Carriers (minutes)",
+      "description": "Classifica dei primi 10 vettori per ritardo medio in arrivo (solo voli non cancellati e non deviati con ≥500 voli).",
+      "type": "barchart",
+      "gridPos": {"h": 12, "w": 24, "x": 0, "y": 0},
+      "datasource": {"type": "redis-datasource", "uid": "redis"},
+      "fieldConfig": {
+        "defaults": {"unit": "short", "decimals": 2, "color": {"mode": "fixed", "fixedColor": "semi-dark-orange"}},
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "xTickLabelRotation": 0,
+        "fillOpacity": 80,
+        "gradientMode": "none",
+        "groupWidth": 0.7,
+        "barWidth": 0.97,
+        "tooltip": {"mode": "single", "sort": "none"},
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": false}
+      },
+      "transformations": [
+        {
+          "id": "convertFieldTypes",
+          "options": {
+            "conversions": [{"targetField": "value", "destinationType": "number"}]
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {"fields": [{"desc": true, "displayName": "value"}]}
+        }
+      ],
+      "targets": [
+        {
+          "datasource": {"type": "redis-datasource", "uid": "redis"},
+          "refId": "A",
+          "command": "hgetall",
+          "keyName": "q2:viz:avg_arr_delay",
+          "hide": false
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Avg Delay Components per Carrier (minutes)",
+      "description": "Contributo medio delle diverse cause di ritardo per le top 10 compagnie. Stacked bar: ogni componente è una query separata.",
+      "type": "barchart",
+      "gridPos": {"h": 14, "w": 24, "x": 0, "y": 12},
+      "datasource": {"type": "redis-datasource", "uid": "redis"},
+      "fieldConfig": {
+        "defaults": {"unit": "short", "decimals": 2, "color": {"mode": "palette-classic"}},
+        "overrides": []
+      },
+      "options": {
+        "orientation": "auto",
+        "xTickLabelRotation": -45,
+        "fillOpacity": 80,
+        "gradientMode": "none",
+        "groupWidth": 0.7,
+        "barWidth": 0.97,
+        "stacking": {"mode": "normal", "group": "A"},
+        "tooltip": {"mode": "multi", "sort": "none"},
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}
+      },
+      "transformations": [
+        {
+          "id": "convertFieldTypes",
+          "options": {
+            "conversions": [{"targetField": "value", "destinationType": "number"}]
+          }
+        },
+        {
+          "id": "joinByField",
+          "options": {"byField": "field", "mode": "outer"}
+        },
+        {
+          "id": "organize",
+          "options": {
+            "renameByName": {
+              "value 1": "Carrier",
+              "value 2": "Weather",
+              "value 3": "NAS",
+              "value 4": "Security",
+              "value 5": "Late Aircraft",
+              "field": "Carrier"
+            }
+          }
+        }
+      ],
+      "targets": [
+        {
+          "datasource": {"type": "redis-datasource", "uid": "redis"},
+          "refId": "A",
+          "command": "hgetall",
+          "keyName": "q2:viz:avg_carrier_delay",
+          "hide": false
+        },
+        {
+          "datasource": {"type": "redis-datasource", "uid": "redis"},
+          "refId": "B",
+          "command": "hgetall",
+          "keyName": "q2:viz:avg_weather_delay",
+          "hide": false
+        },
+        {
+          "datasource": {"type": "redis-datasource", "uid": "redis"},
+          "refId": "C",
+          "command": "hgetall",
+          "keyName": "q2:viz:avg_nas_delay",
+          "hide": false
+        },
+        {
+          "datasource": {"type": "redis-datasource", "uid": "redis"},
+          "refId": "D",
+          "command": "hgetall",
+          "keyName": "q2:viz:avg_security_delay",
+          "hide": false
+        },
+        {
+          "datasource": {"type": "redis-datasource", "uid": "redis"},
+          "refId": "E",
+          "command": "hgetall",
+          "keyName": "q2:viz:avg_late_aircraft_delay",
+          "hide": false
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Full Q2 Table — All Metrics",
+      "type": "table",
+      "gridPos": {"h": 10, "w": 24, "x": 0, "y": 26},
+      "datasource": {"type": "redis-datasource", "uid": "redis"},
+      "fieldConfig": {"defaults": {}, "overrides": []},
+      "options": {"showHeader": true},
+      "targets": [
+        {
+          "datasource": {"type": "redis-datasource", "uid": "redis"},
+          "refId": "A",
+          "command": "hgetall",
+          "keyName": "q2:viz:avg_arr_delay",
+          "hide": false
+        }
+      ]
+    }
+  ]
+}
