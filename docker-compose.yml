@@ -33,7 +33,8 @@ services:
     networks: [sabd-net]
 
   spark-master:
-    image: ${SPARK_IMAGE}:${SPARK_IMAGE_VERSION}
+    build: ./spark
+    image: sabd-spark:${SPARK_IMAGE_VERSION}
     platform: ${PLATFORM}
     container_name: spark-master
     hostname: spark-master
@@ -52,7 +53,7 @@ services:
     networks: [sabd-net]
 
   spark-worker:
-    image: ${SPARK_IMAGE}:${SPARK_IMAGE_VERSION}
+    image: sabd-spark:${SPARK_IMAGE_VERSION}
     platform: ${PLATFORM}
     container_name: spark-worker
     hostname: spark-worker
