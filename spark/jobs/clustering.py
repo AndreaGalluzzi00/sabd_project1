@@ -1,15 +1,19 @@
 """
 Clustering — K-Means su feature aggregate per compagnia (gen-apr 2025)
 
-Feature (per carrier, 8 dimensioni):
+Feature (per carrier, 12 dimensioni):
   avg_dep_delay       media DEP_DELAY voli non cancellati
   avg_arr_delay       media ARR_DELAY voli non cancellati e non deviati
   cancellation_rate   % voli cancellati su totale
-  avg_carrier_delay   media CARRIER_DELAY (NULL → 0)
-  avg_weather_delay   media WEATHER_DELAY (NULL → 0)
-  avg_nas_delay       media NAS_DELAY (NULL → 0)
-  avg_security_delay  media SECURITY_DELAY (NULL → 0)
-  avg_late_aircraft   media LATE_AIRCRAFT_DELAY (NULL → 0)
+  avg_carrier_delay   media CARRIER_DELAY (NULL → 0, voli non cancellati)
+  avg_weather_delay   media WEATHER_DELAY (NULL → 0, voli non cancellati)
+  avg_nas_delay       media NAS_DELAY (NULL → 0, voli non cancellati)
+  avg_security_delay  media SECURITY_DELAY (NULL → 0, voli non cancellati)
+  avg_late_aircraft   media LATE_AIRCRAFT_DELAY (NULL → 0, voli non cancellati)
+  std_dep_delay       deviazione standard DEP_DELAY voli non cancellati (imprevedibilità)
+  on_time_rate        % voli con DEP_DELAY ≤ 0 tra i non cancellati (puntualità)
+  diverted_rate       % voli deviati su totale
+  avg_delay_recovery  media (DEP_DELAY − ARR_DELAY) voli completati (recupero in volo)
 
 Pipeline:
   1. Aggregazione features per top-N carrier per numero voli
@@ -36,6 +40,7 @@ from pyspark.sql import SparkSession
 from pyspark.sql.functions import (
     col, avg, count, sum as spark_sum,
     when, coalesce, lit, round as spark_round, desc,
+    stddev,
 )
 from pyspark.ml.feature import VectorAssembler, StandardScaler, PCA
 from pyspark.ml.clustering import KMeans
@@ -60,6 +65,10 @@ FEATURE_COLS = [
     "avg_nas_delay",
     "avg_security_delay",
     "avg_late_aircraft",
+    "std_dep_delay",
+    "on_time_rate",
+    "diverted_rate",
+    "avg_delay_recovery",
 ]
 
 os.makedirs(os.path.dirname(LOCAL_OUT_CSV), exist_ok=True)
@@ -111,6 +120,19 @@ features_df = (
         spark_round(avg(when(col("CANCELLED") == 0, coalesce(col("NAS_DELAY"),           lit(0.0)))), 4).alias("avg_nas_delay"),
         spark_round(avg(when(col("CANCELLED") == 0, coalesce(col("SECURITY_DELAY"),      lit(0.0)))), 4).alias("avg_security_delay"),
         spark_round(avg(when(col("CANCELLED") == 0, coalesce(col("LATE_AIRCRAFT_DELAY"), lit(0.0)))), 4).alias("avg_late_aircraft"),
+        spark_round(
+            stddev(when(col("CANCELLED") == 0, col("DEP_DELAY"))), 4
+        ).alias("std_dep_delay"),
+        spark_round(
+            spark_sum(when((col("CANCELLED") == 0) & (col("DEP_DELAY") <= 0), lit(1.0)).otherwise(lit(0.0))) /
+            spark_sum(when(col("CANCELLED") == 0, lit(1.0)).otherwise(lit(0.0))) * 100, 4
+        ).alias("on_time_rate"),
+        spark_round(
+            spark_sum("DIVERTED") / count("*") * 100, 4
+        ).alias("diverted_rate"),
+        spark_round(
+            avg(when((col("CANCELLED") == 0) & (col("DIVERTED") == 0), col("DEP_DELAY") - col("ARR_DELAY"))), 4
+        ).alias("avg_delay_recovery"),
     )
 )
 features_df.cache()
