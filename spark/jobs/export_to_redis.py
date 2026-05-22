@@ -30,6 +30,8 @@ Environment variables:
   REDIS_PORT  (default: 6379)
 """
 
+from __future__ import annotations
+
 import csv
 import os
 
