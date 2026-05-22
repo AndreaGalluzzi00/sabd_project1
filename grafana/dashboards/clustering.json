@@ -1,0 +1,238 @@
+{
+  "id": null,
+  "uid": "sabd-clustering",
+  "title": "Clustering — K-Means per Compagnia Aerea",
+  "tags": ["sabd", "clustering"],
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": false,
+  "time": {"from": "now-1h", "to": "now"},
+  "timepicker": {"hidden": true},
+  "panels": [
+    {
+      "id": 1,
+      "title": "Cluster Assignment per Carrier",
+      "description": "K-Means clustering: assegnazione di ogni compagnia al proprio cluster. Chiave Redis: clustering:assignments",
+      "type": "table",
+      "gridPos": {"h": 8, "w": 8, "x": 0, "y": 0},
+      "datasource": {"type": "redis-datasource", "uid": "redis"},
+      "fieldConfig": {
+        "defaults": {"color": {"mode": "thresholds"}, "custom": {"align": "auto"}},
+        "overrides": [
+          {
+            "matcher": {"id": "byName", "options": "value"},
+            "properties": [
+              {"id": "displayName", "value": "Cluster"},
+              {"id": "custom.width", "value": 80}
+            ]
+          },
+          {
+            "matcher": {"id": "byName", "options": "field"},
+            "properties": [{"id": "displayName", "value": "Carrier"}]
+          }
+        ]
+      },
+      "options": {"showHeader": true, "sortBy": [{"displayName": "Cluster", "desc": false}]},
+      "targets": [
+        {
+          "datasource": {"type": "redis-datasource", "uid": "redis"},
+          "refId": "A",
+          "command": "hgetall",
+          "keyName": "clustering:assignments"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Avg Departure Delay per Carrier (colorato per cluster)",
+      "description": "Media DEP_DELAY per compagnia (voli non cancellati). Chiave Redis: clustering:viz:avg_dep_delay",
+      "type": "barchart",
+      "gridPos": {"h": 8, "w": 16, "x": 8, "y": 0},
+      "datasource": {"type": "redis-datasource", "uid": "redis"},
+      "fieldConfig": {
+        "defaults": {"unit": "short", "decimals": 2, "color": {"mode": "palette-classic"}},
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "xTickLabelRotation": 0,
+        "fillOpacity": 80,
+        "gradientMode": "none",
+        "groupWidth": 0.7,
+        "barWidth": 0.97,
+        "tooltip": {"mode": "single", "sort": "none"},
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": false}
+      },
+      "transformations": [
+        {
+          "id": "convertFieldTypes",
+          "options": {"conversions": [{"targetField": "value", "destinationType": "number"}]}
+        },
+        {
+          "id": "sortBy",
+          "options": {"fields": [{"desc": false, "displayName": "value"}]}
+        }
+      ],
+      "targets": [
+        {
+          "datasource": {"type": "redis-datasource", "uid": "redis"},
+          "refId": "A",
+          "command": "hgetall",
+          "keyName": "clustering:viz:avg_dep_delay"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Cancellation Rate per Carrier (%)",
+      "description": "Percentuale voli cancellati per compagnia. Chiave Redis: clustering:viz:cancellation_rate",
+      "type": "barchart",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+      "datasource": {"type": "redis-datasource", "uid": "redis"},
+      "fieldConfig": {
+        "defaults": {"unit": "percent", "decimals": 2, "color": {"mode": "palette-classic"}},
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "xTickLabelRotation": 0,
+        "fillOpacity": 80,
+        "gradientMode": "none",
+        "groupWidth": 0.7,
+        "barWidth": 0.97,
+        "tooltip": {"mode": "single", "sort": "none"},
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": false}
+      },
+      "transformations": [
+        {
+          "id": "convertFieldTypes",
+          "options": {"conversions": [{"targetField": "value", "destinationType": "number"}]}
+        },
+        {
+          "id": "sortBy",
+          "options": {"fields": [{"desc": true, "displayName": "value"}]}
+        }
+      ],
+      "targets": [
+        {
+          "datasource": {"type": "redis-datasource", "uid": "redis"},
+          "refId": "A",
+          "command": "hgetall",
+          "keyName": "clustering:viz:cancellation_rate"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Avg Arrival Delay per Carrier (minuti)",
+      "description": "Media ARR_DELAY per compagnia (voli non cancellati e non deviati). Chiave Redis: clustering:viz:avg_arr_delay",
+      "type": "barchart",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+      "datasource": {"type": "redis-datasource", "uid": "redis"},
+      "fieldConfig": {
+        "defaults": {"unit": "short", "decimals": 2, "color": {"mode": "palette-classic"}},
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "xTickLabelRotation": 0,
+        "fillOpacity": 80,
+        "gradientMode": "none",
+        "groupWidth": 0.7,
+        "barWidth": 0.97,
+        "tooltip": {"mode": "single", "sort": "none"},
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": false}
+      },
+      "transformations": [
+        {
+          "id": "convertFieldTypes",
+          "options": {"conversions": [{"targetField": "value", "destinationType": "number"}]}
+        },
+        {
+          "id": "sortBy",
+          "options": {"fields": [{"desc": false, "displayName": "value"}]}
+        }
+      ],
+      "targets": [
+        {
+          "datasource": {"type": "redis-datasource", "uid": "redis"},
+          "refId": "A",
+          "command": "hgetall",
+          "keyName": "clustering:viz:avg_arr_delay"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Avg Late Aircraft Delay per Carrier (minuti)",
+      "description": "Contributo medio del fattore 'late aircraft' (effetto domino tra voli). Chiave Redis: clustering:viz:avg_late_aircraft",
+      "type": "barchart",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+      "datasource": {"type": "redis-datasource", "uid": "redis"},
+      "fieldConfig": {
+        "defaults": {"unit": "short", "decimals": 2, "color": {"mode": "palette-classic"}},
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "xTickLabelRotation": 0,
+        "fillOpacity": 80,
+        "gradientMode": "none",
+        "groupWidth": 0.7,
+        "barWidth": 0.97,
+        "tooltip": {"mode": "single", "sort": "none"},
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": false}
+      },
+      "transformations": [
+        {
+          "id": "convertFieldTypes",
+          "options": {"conversions": [{"targetField": "value", "destinationType": "number"}]}
+        }
+      ],
+      "targets": [
+        {
+          "datasource": {"type": "redis-datasource", "uid": "redis"},
+          "refId": "A",
+          "command": "hgetall",
+          "keyName": "clustering:viz:avg_late_aircraft"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Avg Carrier Delay per Carrier (minuti)",
+      "description": "Ritardi imputabili direttamente alla compagnia. Chiave Redis: clustering:viz:avg_carrier_delay",
+      "type": "barchart",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+      "datasource": {"type": "redis-datasource", "uid": "redis"},
+      "fieldConfig": {
+        "defaults": {"unit": "short", "decimals": 2, "color": {"mode": "palette-classic"}},
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "xTickLabelRotation": 0,
+        "fillOpacity": 80,
+        "gradientMode": "none",
+        "groupWidth": 0.7,
+        "barWidth": 0.97,
+        "tooltip": {"mode": "single", "sort": "none"},
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": false}
+      },
+      "transformations": [
+        {
+          "id": "convertFieldTypes",
+          "options": {"conversions": [{"targetField": "value", "destinationType": "number"}]}
+        }
+      ],
+      "targets": [
+        {
+          "datasource": {"type": "redis-datasource", "uid": "redis"},
+          "refId": "A",
+          "command": "hgetall",
+          "keyName": "clustering:viz:avg_carrier_delay"
+        }
+      ]
+    }
+  ]
+}

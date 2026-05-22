@@ -43,7 +43,6 @@ Q1_CSV      = os.path.join(RESULTS_DIR, "q1.csv")
 Q2_CSV      = os.path.join(RESULTS_DIR, "q2.csv")
 Q3_PCT_CSV  = os.path.join(RESULTS_DIR, "q3_percentiles.csv")
 Q3_RNG_CSV  = os.path.join(RESULTS_DIR, "q3_delay_range.csv")
-Q4_CSV      = os.path.join(RESULTS_DIR, "q4_clustering.csv")   # prodotto da q4.py
 
 MONTH_LABELS = {"1": "Jan", "2": "Feb", "3": "Mar", "4": "Apr"}
 
@@ -188,37 +187,63 @@ def export_grafana_viz(r: redis.Redis) -> None:
     print("  Q3 viz: q3:viz:{carrier}:{p25|p50|p75|p90}  (field = ora 00–23)")
 
 
-# ── Q4 Clustering (placeholder) ───────────────────────────────────────────────
+# ── Clustering ────────────────────────────────────────────────────────────────
 #
-# Da implementare quando q4.py (K-means) sarà pronto.
-# Il CSV atteso ha colonne:
-#   OP_UNIQUE_CARRIER, cluster_id,
-#   avg_dep_delay, avg_arr_delay, cancellation_rate,
-#   avg_carrier_delay, avg_weather_delay, avg_nas_delay,
-#   avg_security_delay, avg_late_aircraft_delay
+# CSV prodotto da clustering.py:
+#   OP_UNIQUE_CARRIER, total_flights, avg_dep_delay, avg_arr_delay,
+#   cancellation_rate, avg_carrier_delay, avg_weather_delay, avg_nas_delay,
+#   avg_security_delay, avg_late_aircraft, prediction
 #
-# def export_q4(r: redis.Redis) -> int:
-#     written = 0
-#     with open(Q4_CSV, newline="") as f:
-#         for row in csv.DictReader(f):
-#             carrier    = row["OP_UNIQUE_CARRIER"]
-#             cluster_id = row["cluster_id"]
-#             r.hset(f"q4:carrier:{carrier}", mapping={
-#                 "cluster_id":             cluster_id,
-#                 "avg_dep_delay":          row["avg_dep_delay"],
-#                 "avg_arr_delay":          row["avg_arr_delay"],
-#                 "cancellation_rate":      row["cancellation_rate"],
-#                 "avg_carrier_delay":      row["avg_carrier_delay"],
-#                 "avg_weather_delay":      row["avg_weather_delay"],
-#                 "avg_nas_delay":          row["avg_nas_delay"],
-#                 "avg_security_delay":     row["avg_security_delay"],
-#                 "avg_late_aircraft_delay": row["avg_late_aircraft_delay"],
-#             })
-#             r.zadd("q4:ranking", {carrier: float(cluster_id)})
-#             # Grafana viz: raggruppa per cluster
-#             r.hset("q4:viz:cluster_assignment", carrier, cluster_id)
-#             written += 1
-#     return written
+# Chiavi Redis:
+#   clustering:carrier:{carrier}    HASH  tutte le colonne (dettaglio tabella)
+#   clustering:assignments          HASH  {carrier → cluster_id}          (dashboard viz)
+#   clustering:viz:avg_dep_delay    HASH  {carrier → valore}              (barchart)
+#   clustering:viz:cancellation_rate HASH {carrier → valore}              (barchart)
+#   clustering:meta                 HASH  {k, n_carriers}
+
+CLUSTERING_CSV = os.path.join(RESULTS_DIR, "clustering.csv")
+
+CLUSTERING_VIZ_METRICS = [
+    "avg_dep_delay", "avg_arr_delay", "cancellation_rate",
+    "avg_carrier_delay", "avg_late_aircraft",
+]
+
+
+def export_clustering(r: redis.Redis) -> int:
+    if not os.path.exists(CLUSTERING_CSV):
+        print("  [SKIP] clustering.csv non trovato — esegui prima clustering.py")
+        return 0
+
+    rows = []
+    with open(CLUSTERING_CSV, newline="") as f:
+        rows = list(csv.DictReader(f))
+
+    assignments: dict[str, str] = {}
+    viz: dict[str, dict[str, str]] = {m: {} for m in CLUSTERING_VIZ_METRICS}
+
+    for row in rows:
+        carrier    = row["OP_UNIQUE_CARRIER"]
+        cluster_id = row["prediction"]
+        assignments[carrier] = cluster_id
+
+        r.hset(f"clustering:carrier:{carrier}", mapping={
+            k: row[k] for k in row if k != "OP_UNIQUE_CARRIER"
+        })
+
+        for metric in CLUSTERING_VIZ_METRICS:
+            viz[metric][carrier] = row[metric]
+
+    r.delete("clustering:assignments")
+    r.hset("clustering:assignments", mapping=assignments)
+
+    for metric, mapping in viz.items():
+        r.delete(f"clustering:viz:{metric}")
+        r.hset(f"clustering:viz:{metric}", mapping=mapping)
+
+    k = max(int(v) for v in assignments.values()) + 1
+    r.hset("clustering:meta", mapping={"k": k, "n_carriers": len(rows)})
+
+    return len(rows)
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
@@ -238,9 +263,9 @@ def main():
     print("\n── Grafana viz keys ────────────────────────────────────────────")
     export_grafana_viz(r)
 
-    # Uncomment once q4.py is ready:
-    # n = export_q4(r)
-    # print(f"Q4: {n} carrier cluster keys written")
+    n = export_clustering(r)
+    if n:
+        print(f"Clustering: {n} carrier keys written  (clustering:carrier:{{carrier}} + viz)")
 
     # ── Spot-check: print a few keys ─────────────────────────────────────────
     print("\n── Spot-check ──────────────────────────────────────────────────")
