@@ -8,8 +8,8 @@ SPARK_MASTER = os.getenv("SPARK_MASTER", "local[2]")
 HDFS_INPUT = "hdfs://namenode:9000/sabd/processed/"
 HDFS_OUTPUT_PERCENTILES = "hdfs://namenode:9000/sabd/results/q3_sql/percentiles/"
 HDFS_OUTPUT_RANGE = "hdfs://namenode:9000/sabd/results/q3_sql/delay_range/"
-LOCAL_OUT_PERCENTILES = "/opt/spark/jobs/results/q3_sql_percentiles.csv"
-LOCAL_OUT_RANGE = "/opt/spark/jobs/results/q3_sql_delay_range.csv"
+LOCAL_OUT_PERCENTILES = "/opt/spark/jobs/results/q3_percentiles_sql.csv"
+LOCAL_OUT_RANGE = "/opt/spark/jobs/results/q3_delay_range_sql.csv"
 LOCAL_OUT = "/opt/spark/jobs/results"
 
 os.makedirs(LOCAL_OUT, exist_ok=True)

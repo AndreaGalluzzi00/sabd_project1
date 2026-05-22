@@ -39,7 +39,7 @@ from pyspark.sql.functions import (
 )
 from pyspark.ml.feature import VectorAssembler, StandardScaler, PCA
 from pyspark.ml.clustering import KMeans
-from pyspark.ml.evaluation import ClusteringEvaluator
+from sklearn.metrics import silhouette_score
 
 # ── Configurazione ────────────────────────────────────────────────────────────
 SPARK_MASTER      = os.getenv("SPARK_MASTER", "local[2]")
@@ -106,11 +106,11 @@ features_df = (
         spark_round(
             spark_sum("CANCELLED") / count("*") * 100, 4
         ).alias("cancellation_rate"),
-        spark_round(avg(coalesce(col("CARRIER_DELAY"),       lit(0.0))), 4).alias("avg_carrier_delay"),
-        spark_round(avg(coalesce(col("WEATHER_DELAY"),       lit(0.0))), 4).alias("avg_weather_delay"),
-        spark_round(avg(coalesce(col("NAS_DELAY"),           lit(0.0))), 4).alias("avg_nas_delay"),
-        spark_round(avg(coalesce(col("SECURITY_DELAY"),      lit(0.0))), 4).alias("avg_security_delay"),
-        spark_round(avg(coalesce(col("LATE_AIRCRAFT_DELAY"), lit(0.0))), 4).alias("avg_late_aircraft"),
+        spark_round(avg(when(col("CANCELLED") == 0, coalesce(col("CARRIER_DELAY"),       lit(0.0)))), 4).alias("avg_carrier_delay"),
+        spark_round(avg(when(col("CANCELLED") == 0, coalesce(col("WEATHER_DELAY"),       lit(0.0)))), 4).alias("avg_weather_delay"),
+        spark_round(avg(when(col("CANCELLED") == 0, coalesce(col("NAS_DELAY"),           lit(0.0)))), 4).alias("avg_nas_delay"),
+        spark_round(avg(when(col("CANCELLED") == 0, coalesce(col("SECURITY_DELAY"),      lit(0.0)))), 4).alias("avg_security_delay"),
+        spark_round(avg(when(col("CANCELLED") == 0, coalesce(col("LATE_AIRCRAFT_DELAY"), lit(0.0)))), 4).alias("avg_late_aircraft"),
     )
 )
 features_df.cache()
@@ -129,10 +129,9 @@ scaler_model  = scaler.fit(df_assembled)
 df_scaled     = scaler_model.transform(df_assembled)
 
 # ── 4. Elbow + Silhouette per k in [2..6] ────────────────────────────────────
-evaluator = ClusteringEvaluator(
-    featuresCol="features", metricName="silhouette",
-    distanceMeasure="squaredEuclidean"
-)
+# Matrice numpy delle feature scalate (14 carrier × 8 feature): raccolta una sola volta
+X_scaled = np.array([r["features"].toArray()
+                     for r in df_scaled.select("features").collect()])
 
 wssse_list      = []
 silhouette_list = []
@@ -143,7 +142,9 @@ for k in K_RANGE:
     model = km.fit(df_scaled)
     preds = model.transform(df_scaled)
     wssse = model.summary.trainingCost
-    sil   = evaluator.evaluate(preds)
+    labels = np.array([r["prediction"] for r in preds.select("prediction").collect()])
+    # Silhouette euclideo standard (metrica propria, non distanza quadrata)
+    sil   = silhouette_score(X_scaled, labels, metric="euclidean")
     wssse_list.append(wssse)
     silhouette_list.append(sil)
     print(f"  k={k}  WSSSE={wssse:.4f}  Silhouette={sil:.4f}")
