@@ -4,7 +4,7 @@ import time
 
 from pyspark.sql import SparkSession
 
-SPARK_MASTER = os.getenv("SPARK_MASTER", "local[2]")
+SPARK_MASTER = os.getenv("SPARK_MASTER","spark://spark-master:7077")
 HDFS_INPUT = "hdfs://namenode:9000/sabd/processed/"
 HDFS_OUTPUT_PERCENTILES = "hdfs://namenode:9000/sabd/results/q3_sql/percentiles/"
 HDFS_OUTPUT_RANGE = "hdfs://namenode:9000/sabd/results/q3_sql/delay_range/"
@@ -31,7 +31,7 @@ df = spark.read.parquet(HDFS_INPUT)
 # registro questo DataFrame come tabella SQL temporanea chiamata flights
 df.createOrReplaceTempView("flights")
 
-# ── Calcolo Q3 SQL ───────────────────────────────────────────────────────────
+# Calcolo Q3 SQL
 
 t0 = time.time()
 
@@ -84,7 +84,7 @@ range_rows = delay_range.collect()
 
 elapsed = time.time() - t0
 
-# ── Output a schermo ─────────────────────────────────────────────────────────
+# Output a schermo
 
 print(f"\n{'='*70}")
 print(f"Q3 SQL — RISULTATI  (tempo esecuzione: {elapsed:.2f}s)")
@@ -96,7 +96,7 @@ percentiles.show(100, truncate=False)
 print("\n=== Min/Max DEP_DELAY per compagnia ===")
 delay_range.show(truncate=False)
 
-# ── Salvataggio CSV locale ───────────────────────────────────────────────────
+# Salvataggio CSV locale
 
 with open(LOCAL_OUT_PERCENTILES, "w", newline="") as f:
     writer = csv.writer(f)
@@ -117,7 +117,7 @@ with open(LOCAL_OUT_RANGE, "w", newline="") as f:
 print(f"\nCSV locale percentili: {LOCAL_OUT_PERCENTILES}")
 print(f"CSV locale min/max: {LOCAL_OUT_RANGE}")
 
-# ── Salvataggio su HDFS ──────────────────────────────────────────────────────
+# Salvataggio su HDFS
 
 percentiles.coalesce(1) \
     .write \
