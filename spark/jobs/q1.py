@@ -18,7 +18,7 @@ from pyspark.sql.functions import (
     count, sum as spark_sum, when, round as spark_round,
 )
 
-SPARK_MASTER = os.getenv("SPARK_MASTER", "local[2]")
+SPARK_MASTER = os.getenv("SPARK_MASTER","spark://spark-master:7077")
 HDFS_INPUT   = "hdfs://namenode:9000/sabd/processed/"
 HDFS_OUTPUT  = "hdfs://namenode:9000/sabd/results/q1/"
 LOCAL_OUT    = "/opt/spark/jobs/results/q1.csv"
@@ -36,13 +36,13 @@ spark = (
 spark.sparkContext.setLogLevel("WARN")
 print(f"Master: {SPARK_MASTER}")
 
-# ── Lettura ──────────────────────────────────────────────────────────────────
+# Lettura
 df = (
     spark.read.parquet(HDFS_INPUT)
     .filter(col("OP_UNIQUE_CARRIER").isin("AA", "DL"))
 )
 
-# ── Calcolo Q1 ───────────────────────────────────────────────────────────────
+# Calcolo Q1
 t0 = time.time()
 
 result = (
@@ -70,13 +70,13 @@ result.cache()
 rows = result.collect()
 elapsed = time.time() - t0
 
-# ── Output a schermo ─────────────────────────────────────────────────────────
+# Output a schermo
 print(f"\n{'='*70}")
 print(f"Q1 — RISULTATI  (tempo esecuzione: {elapsed:.2f}s)")
 print(f"{'='*70}")
 result.show(20, truncate=False)
 
-# ── Salvataggio CSV locale (directory montata → visibile sull'host) ──────────
+# Salvataggio CSV locale (directory montata → visibile sull'host)
 cols = result.columns
 with open(LOCAL_OUT, "w", newline="") as f:
     writer = csv.writer(f)
@@ -85,7 +85,7 @@ with open(LOCAL_OUT, "w", newline="") as f:
         writer.writerow([row[c] for c in cols])
 print(f"CSV locale:  {LOCAL_OUT}")
 
-# ── Salvataggio su HDFS ───────────────────────────────────────────────────────
+# Salvataggio su HDFS
 result.coalesce(1).write.mode("overwrite").option("header", "true").csv(HDFS_OUTPUT)
 print(f"CSV su HDFS: {HDFS_OUTPUT}")
 

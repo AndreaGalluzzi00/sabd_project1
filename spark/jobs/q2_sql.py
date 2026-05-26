@@ -16,7 +16,7 @@ import os
 import time
 from pyspark.sql import SparkSession
 
-SPARK_MASTER = os.getenv("SPARK_MASTER", "local[2]")
+SPARK_MASTER = os.getenv("SPARK_MASTER","spark://spark-master:7077")
 HDFS_INPUT   = "hdfs://namenode:9000/sabd/processed/"
 HDFS_OUTPUT  = "hdfs://namenode:9000/sabd/results/q2_sql/"
 LOCAL_OUT    = "/opt/spark/jobs/results/q2_sql.csv"
@@ -34,11 +34,11 @@ spark = (
 spark.sparkContext.setLogLevel("WARN")
 print(f"Master: {SPARK_MASTER}")
 
-# ── Lettura e registrazione come vista temporanea ─────────────────────────────
+# Lettura e registrazione come vista temporanea
 df = spark.read.parquet(HDFS_INPUT)
 df.createOrReplaceTempView("flights")
 
-# ── Calcolo Q2 con Spark SQL ──────────────────────────────────────────────────
+# Calcolo Q2 con Spark SQL
 t0 = time.time()
 
 result = spark.sql("""
@@ -64,13 +64,13 @@ result.cache()
 rows = result.collect()
 elapsed = time.time() - t0
 
-# ── Output a schermo ─────────────────────────────────────────────────────────
+# Output a schermo
 print(f"\n{'='*70}")
 print(f"Q2 SQL — RISULTATI  (tempo esecuzione: {elapsed:.2f}s)")
 print(f"{'='*70}")
 result.show(10, truncate=False)
 
-# ── Salvataggio CSV locale ────────────────────────────────────────────────────
+# Salvataggio CSV locale
 cols = result.columns
 with open(LOCAL_OUT, "w", newline="") as f:
     writer = csv.writer(f)
@@ -79,7 +79,7 @@ with open(LOCAL_OUT, "w", newline="") as f:
         writer.writerow([row[c] for c in cols])
 print(f"CSV locale:  {LOCAL_OUT}")
 
-# ── Salvataggio su HDFS ───────────────────────────────────────────────────────
+# Salvataggio su HDFS
 result.coalesce(1).write.mode("overwrite").option("header", "true").csv(HDFS_OUTPUT)
 print(f"CSV su HDFS: {HDFS_OUTPUT}")
 
