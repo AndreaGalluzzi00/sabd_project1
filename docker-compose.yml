@@ -54,6 +54,7 @@ services:
 
   spark-worker:
     image: sabd-spark:${SPARK_IMAGE_VERSION}
+    pull_policy: never
     platform: ${PLATFORM}
     container_name: spark-worker
     hostname: spark-worker
