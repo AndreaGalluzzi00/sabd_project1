@@ -45,7 +45,7 @@ result = spark.sql("""
         YEAR,
         MONTH,
         COUNT(*)                                                        AS total_flights,
-        CAST(SUM(CANCELLED) AS BIGINT)                                  AS cancelled_flights,
+        SUM(CAST(CANCELLED AS LONG))                                    AS cancelled_flights,
         ROUND(SUM(CANCELLED) / COUNT(*) * 100, 4)                      AS cancellation_rate_pct,
         ROUND(AVG(CASE WHEN CANCELLED = 0 THEN DEP_DELAY END), 4)      AS avg_dep_delay,
         ROUND(MIN(CASE WHEN CANCELLED = 0 THEN DEP_DELAY END), 4)      AS min_dep_delay,

@@ -47,7 +47,7 @@ from pyspark.ml.clustering import KMeans
 from sklearn.metrics import silhouette_score
 
 # ── Configurazione ────────────────────────────────────────────────────────────
-SPARK_MASTER      = os.getenv("SPARK_MASTER", "local[2]")
+SPARK_MASTER      = os.getenv("SPARK_MASTER", "spark://spark-master:7077")
 HDFS_INPUT        = "hdfs://namenode:9000/sabd/processed/"
 HDFS_OUTPUT       = "hdfs://namenode:9000/sabd/results/clustering/"
 LOCAL_OUT_CSV     = "/opt/spark/jobs/results/clustering.csv"
