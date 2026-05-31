@@ -105,7 +105,7 @@
           "kerberos-user-service": null,
           "writing-strategy": "writeAndRename",
           "Kerberos Relogin Period": "4 hours",
-          "Directory": "/sabd/processed/",
+          "Directory": "/sabd/processed/MONTH=${MONTH}/",
           "Conflict Resolution Strategy": "replace"
         },
         "propertyDescriptors": {
@@ -476,12 +476,19 @@
           "version": "1.25.0"
         },
         "properties": {
-          "filename": "${filename:substringBeforeLast('.')}.parquet"
+          "filename": "${filename:substringBeforeLast('.')}.parquet",
+          "MONTH": "${filename:substring(4,6)}"
         },
         "propertyDescriptors": {
           "filename": {
             "name": "filename",
             "displayName": "filename",
+            "identifiesControllerService": false,
+            "sensitive": false
+          },
+          "MONTH": {
+            "name": "MONTH",
+            "displayName": "MONTH",
             "identifiesControllerService": false,
             "sensitive": false
           }
@@ -729,7 +736,7 @@
           "schema-access-strategy": "schema-text-property",
           "schema-version": null,
           "csvutils-character-set": "UTF-8",
-          "schema-text": "{\"type\":\"record\",\"name\":\"Flight\",\"namespace\":\"sabd\",\"fields\":[{\"name\":\"YEAR\",\"type\":[\"null\",\"int\"],\"default\":null},{\"name\":\"MONTH\",\"type\":[\"null\",\"int\"],\"default\":null},{\"name\":\"DAY_OF_MONTH\",\"type\":[\"null\",\"int\"],\"default\":null},{\"name\":\"OP_UNIQUE_CARRIER\",\"type\":[\"null\",\"string\"],\"default\":null},{\"name\":\"CRS_DEP_TIME\",\"type\":[\"null\",\"int\"],\"default\":null},{\"name\":\"DEP_DELAY\",\"type\":[\"null\",\"double\"],\"default\":null},{\"name\":\"ARR_DELAY\",\"type\":[\"null\",\"double\"],\"default\":null},{\"name\":\"CANCELLED\",\"type\":[\"null\",\"double\"],\"default\":null},{\"name\":\"DIVERTED\",\"type\":[\"null\",\"double\"],\"default\":null},{\"name\":\"CARRIER_DELAY\",\"type\":[\"null\",\"double\"],\"default\":null},{\"name\":\"WEATHER_DELAY\",\"type\":[\"null\",\"double\"],\"default\":null},{\"name\":\"NAS_DELAY\",\"type\":[\"null\",\"double\"],\"default\":null},{\"name\":\"SECURITY_DELAY\",\"type\":[\"null\",\"double\"],\"default\":null},{\"name\":\"LATE_AIRCRAFT_DELAY\",\"type\":[\"null\",\"double\"],\"default\":null}]}"
+          "schema-text": "{\"type\":\"record\",\"name\":\"Flight\",\"namespace\":\"sabd\",\"fields\":[{\"name\":\"YEAR\",\"type\":[\"null\",\"int\"],\"default\":null},{\"name\":\"DAY_OF_MONTH\",\"type\":[\"null\",\"int\"],\"default\":null},{\"name\":\"OP_UNIQUE_CARRIER\",\"type\":[\"null\",\"string\"],\"default\":null},{\"name\":\"CRS_DEP_TIME\",\"type\":[\"null\",\"int\"],\"default\":null},{\"name\":\"DEP_DELAY\",\"type\":[\"null\",\"double\"],\"default\":null},{\"name\":\"ARR_DELAY\",\"type\":[\"null\",\"double\"],\"default\":null},{\"name\":\"CANCELLED\",\"type\":[\"null\",\"double\"],\"default\":null},{\"name\":\"DIVERTED\",\"type\":[\"null\",\"double\"],\"default\":null},{\"name\":\"CARRIER_DELAY\",\"type\":[\"null\",\"double\"],\"default\":null},{\"name\":\"WEATHER_DELAY\",\"type\":[\"null\",\"double\"],\"default\":null},{\"name\":\"NAS_DELAY\",\"type\":[\"null\",\"double\"],\"default\":null},{\"name\":\"SECURITY_DELAY\",\"type\":[\"null\",\"double\"],\"default\":null},{\"name\":\"LATE_AIRCRAFT_DELAY\",\"type\":[\"null\",\"double\"],\"default\":null}]}"
         },
         "propertyDescriptors": {
           "ignore-csv-header": {

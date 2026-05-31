@@ -26,7 +26,8 @@ df.printSchema()
 
 print("\n--- ROW COUNT PER FILE ---")
 for month in ["202501", "202502", "202503", "202504"]:
-    path = f"{HDFS_PATH}{month}_T_ONTIME_REPORTING.parquet"
+    mm = month[4:6]  # "01".."04" — corrisponde alla partizione MONTH=mm
+    path = f"{HDFS_PATH}MONTH={mm}/{month}_T_ONTIME_REPORTING.parquet"
     n = spark.read.parquet(path).count()
     print(f"  {month}: {n:,} righe")
 
