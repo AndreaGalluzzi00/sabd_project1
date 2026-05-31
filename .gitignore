@@ -13,10 +13,6 @@ venv/
 .DS_Store
 Thumbs.db
 
-# Docker
-.env
-.env.local
-
 # NiFi
 nifi/flows/*.xml.bak
 nifi/conf/
