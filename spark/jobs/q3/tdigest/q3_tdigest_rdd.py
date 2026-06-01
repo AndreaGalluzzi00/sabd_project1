@@ -15,13 +15,20 @@ La mergeability nativa dei digest permette una pipeline distribuita corretta:
 Parametro delta (compressione): default 0.01
   - valori più bassi → più centroidi → maggiore precisione → più memoria
 """
-import csv
 import os
+import sys
 import time
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, floor, min as spark_min, max as spark_max
 from tdigest import TDigest
+
+from utils_output import (
+    show_rdd_result,
+    save_rdd_csv_local,
+)
 
 SPARK_MASTER            = os.getenv("SPARK_MASTER", "spark://spark-master:7077")
 HDFS_INPUT              = "hdfs://namenode:9000/sabd/processed/"
@@ -32,13 +39,16 @@ LOCAL_OUT_RANGE         = "/opt/spark/jobs/results/q3_delay_range_tdigest.csv"
 LOCAL_OUT               = "/opt/spark/jobs/results"
 
 os.makedirs(LOCAL_OUT, exist_ok=True)
+COLS_PERC  = ["OP_UNIQUE_CARRIER", "hour", "p25", "p50", "p75", "p90"]
+COLS_RANGE = ["OP_UNIQUE_CARRIER", "min_delay", "max_delay"]
 
 spark = (
     SparkSession.builder
     .appName("Q3_TDigest_Percentiles")
     .master(SPARK_MASTER)
     .config("spark.hadoop.fs.defaultFS", "hdfs://namenode:9000")
-    .config("spark.ui.enabled", "false")
+    .config("spark.ui.enabled", "true")
+    .config("spark.ui.port", "4040")
     .getOrCreate()
 )
 spark.sparkContext.setLogLevel("WARN")
@@ -105,56 +115,87 @@ percentile_rdd = (
 )
 
 # Min/Max: operazioni esatte, calcolate su DataFrame (no approssimazione)
-delay_range = (
-    df.groupBy("OP_UNIQUE_CARRIER")
-    .agg(
-        spark_min("DEP_DELAY").alias("min_delay"),
-        spark_max("DEP_DELAY").alias("max_delay"),
-    )
-    .orderBy("OP_UNIQUE_CARRIER")
+#ATTENZIONE QUA MODIFICATO RISPETTO A IERI
+range_rdd = (
+    rdd
+    .map(lambda kv: (kv[0][0], (kv[1], kv[1])))
+    .reduceByKey(lambda a, b: (min(a[0], b[0]), max(a[1], b[1])))
+    .map(lambda kv: (kv[0], kv[1][0], kv[1][1]))
+    .sortBy(lambda x: x[0])
 )
 
 percentile_rows = percentile_rdd.collect()
-range_rows = delay_range.collect()
+range_rows = range_rdd.collect()
 elapsed = time.time() - t0
 
-# ── Output ────────────────────────────────────────────────────────────────────
-print(f"\n{'='*70}")
-print(f"Q3 t-digest — RISULTATI  (tempo esecuzione: {elapsed:.2f}s)")
-print(f"{'='*70}")
-print(f"{'carrier':<10} {'hour':>4} {'p25':>6} {'p50':>6} {'p75':>6} {'p90':>6}")
-for row in sorted(percentile_rows):
-    print(f"{row[0]:<10} {row[1]:>4} {row[2]:>6} {row[3]:>6} {row[4]:>6} {row[5]:>6}")
+# ─────────────────────────────────────────────────────────────────────────────
+# Output a schermo + CSV locale
+# ─────────────────────────────────────────────────────────────────────────────
+show_rdd_result(
+    rows=percentile_rows,
+    header=COLS_PERC,
+    query_name="Q3 t-digest RDD — Percentili DEP_DELAY per compagnia e fascia oraria",
+    elapsed=elapsed,
+)
 
-print("\nMin/Max DEP_DELAY per compagnia:")
-for row in range_rows:
-    print(f"  {row.OP_UNIQUE_CARRIER}: min={row.min_delay}, max={row.max_delay}")
 
-# ── CSV locale ────────────────────────────────────────────────────────────────
-COLS_PERC = ["OP_UNIQUE_CARRIER", "hour", "p25", "p50", "p75", "p90"]
 
-with open(LOCAL_OUT_PERCENTILES, "w", newline="") as f:
-    writer = csv.writer(f)
-    writer.writerow(COLS_PERC)
-    writer.writerows(percentile_rows)
+show_rdd_result(
+    rows=range_rows,
+    header=COLS_RANGE,
+    query_name="Q3 t-digest RDD — Min/Max DEP_DELAY per compagnia",
+    elapsed=elapsed,
+)
 
-with open(LOCAL_OUT_RANGE, "w", newline="") as f:
-    writer = csv.writer(f)
-    writer.writerow(delay_range.columns)
-    for row in range_rows:
-        writer.writerow([row[c] for c in delay_range.columns])
+save_rdd_csv_local(
+    path=LOCAL_OUT_PERCENTILES,
+    header=COLS_PERC,
+    rows=percentile_rows,
+)
 
-print(f"\nCSV locale percentili: {LOCAL_OUT_PERCENTILES}")
-print(f"CSV locale min/max:    {LOCAL_OUT_RANGE}")
+save_rdd_csv_local(
+    path=LOCAL_OUT_RANGE,
+    header=COLS_RANGE,
+    rows=range_rows,
+)
 
-# ── HDFS ──────────────────────────────────────────────────────────────────────
-perc_df = spark.createDataFrame(percentile_rows, COLS_PERC)
-perc_df.coalesce(1).write.mode("overwrite").option("header", True).csv(HDFS_OUTPUT_PERCENTILES)
-delay_range.coalesce(1).write.mode("overwrite").option("header", True).csv(HDFS_OUTPUT_RANGE)
+# ─────────────────────────────────────────────────────────────────────────────
+# HDFS: salvataggio RDD puro con saveAsTextFile
+# ─────────────────────────────────────────────────────────────────────────────
+sc = spark.sparkContext
 
-print(f"CSV HDFS percentili:   {HDFS_OUTPUT_PERCENTILES}")
-print(f"CSV HDFS min/max:      {HDFS_OUTPUT_RANGE}")
-print(f"\nTempo Q3 t-digest: {elapsed:.2f}s")
-print(f"{'='*70}\n")
+hadoop_conf = sc._jsc.hadoopConfiguration()
+fs = sc._jvm.org.apache.hadoop.fs.FileSystem.get(hadoop_conf)
+
+out_percentiles = sc._jvm.org.apache.hadoop.fs.Path(HDFS_OUTPUT_PERCENTILES)
+out_range = sc._jvm.org.apache.hadoop.fs.Path(HDFS_OUTPUT_RANGE)
+
+if fs.exists(out_percentiles):
+    fs.delete(out_percentiles, True)
+
+if fs.exists(out_range):
+    fs.delete(out_range, True)
+
+percentile_lines = (
+    [",".join(COLS_PERC)] +
+    [",".join(str(x) for x in row) for row in percentile_rows]
+)
+
+range_lines = (
+    [",".join(COLS_RANGE)] +
+    [",".join(str(x) for x in row) for row in range_rows]
+)
+
+sc.parallelize(percentile_lines, numSlices=1).saveAsTextFile(HDFS_OUTPUT_PERCENTILES)
+sc.parallelize(range_lines, numSlices=1).saveAsTextFile(HDFS_OUTPUT_RANGE)
+
+print(f"CSV su HDFS: {HDFS_OUTPUT_PERCENTILES}")
+print(f"CSV su HDFS: {HDFS_OUTPUT_RANGE}")
+
+print(f"\nTempo Q3 t-digest RDD: {elapsed:.2f}s")
+print(f"{'=' * 70}\n")
+if os.getenv("SPARK_DEBUG_UI", "0") == "1":
+    print("\nSpark UI attiva. Apri http://localhost:4040 per vedere il DAG.")
+    input("Premi INVIO per terminare l'applicazione...")
 
 spark.stop()

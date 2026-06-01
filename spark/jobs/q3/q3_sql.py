@@ -1,8 +1,15 @@
-import csv
-import os
+import sys, os
 import time
 
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 from pyspark.sql import SparkSession
+from utils_output import (
+    show_dataframe_result,
+    save_csv_local,
+    save_dataframe_hdfs,
+)
+
 
 SPARK_MASTER = os.getenv("SPARK_MASTER","spark://spark-master:7077")
 HDFS_INPUT = "hdfs://namenode:9000/sabd/processed/"
@@ -84,57 +91,36 @@ range_rows = delay_range.collect()
 
 elapsed = time.time() - t0
 
-# Output a schermo
+show_dataframe_result(
+    result=percentiles,
+    query_name="Q3 SQL — Percentili DEP_DELAY per compagnia e fascia oraria",
+    elapsed=elapsed,
+    n=100,
+)
 
-print(f"\n{'='*70}")
-print(f"Q3 SQL — RISULTATI  (tempo esecuzione: {elapsed:.2f}s)")
-print(f"{'='*70}")
+show_dataframe_result(
+    result=delay_range,
+    query_name="Q3 SQL — Min/Max DEP_DELAY per compagnia",
+    elapsed=elapsed,
+    n=20,
+)
 
-print("\n=== Percentili per compagnia e fascia oraria ===")
-percentiles.show(100, truncate=False)
+save_csv_local(
+    path=LOCAL_OUT_PERCENTILES,
+    result=percentiles,
+    rows=percentile_rows,
+)
 
-print("\n=== Min/Max DEP_DELAY per compagnia ===")
-delay_range.show(truncate=False)
+save_csv_local(
+    path=LOCAL_OUT_RANGE,
+    result=delay_range,
+    rows=range_rows,
+)
 
-# Salvataggio CSV locale
-
-with open(LOCAL_OUT_PERCENTILES, "w", newline="") as f:
-    writer = csv.writer(f)
-
-    writer.writerow(percentiles.columns)
-
-    for row in percentile_rows:
-        writer.writerow([row[c] for c in percentiles.columns])
-
-with open(LOCAL_OUT_RANGE, "w", newline="") as f:
-    writer = csv.writer(f)
-
-    writer.writerow(delay_range.columns)
-
-    for row in range_rows:
-        writer.writerow([row[c] for c in delay_range.columns])
-
-print(f"\nCSV locale percentili: {LOCAL_OUT_PERCENTILES}")
-print(f"CSV locale min/max: {LOCAL_OUT_RANGE}")
-
-# Salvataggio su HDFS
-
-percentiles.coalesce(1) \
-    .write \
-    .mode("overwrite") \
-    .option("header", "true") \
-    .csv(HDFS_OUTPUT_PERCENTILES)
-
-delay_range.coalesce(1) \
-    .write \
-    .mode("overwrite") \
-    .option("header", "true") \
-    .csv(HDFS_OUTPUT_RANGE)
-
-print(f"\nCSV HDFS percentili: {HDFS_OUTPUT_PERCENTILES}")
-print(f"CSV HDFS min/max: {HDFS_OUTPUT_RANGE}")
+save_dataframe_hdfs(percentiles, HDFS_OUTPUT_PERCENTILES)
+save_dataframe_hdfs(delay_range, HDFS_OUTPUT_RANGE)
 
 print(f"\nTempo Q3 SQL: {elapsed:.2f}s")
-print(f"{'='*70}\n")
+print(f"{'=' * 70}\n")
 
 spark.stop()

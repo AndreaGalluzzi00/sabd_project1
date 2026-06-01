@@ -2,7 +2,7 @@
 Q1 (RDD) — AA e DL: statistiche mensili DEP_DELAY e cancellation rate (gen-apr 2025)
 
 Versione implementata con le API RDD (low-level) di Spark, da confrontare con
-le versioni DataFrame (q1.py) e Spark SQL (q1_sql.py).
+le versioni DataFrame (q1_df.py) e Spark SQL (q1_sql.py).
 
 Metriche:
   - cancellation_rate: su TUTTI i voli del mese
@@ -23,6 +23,7 @@ import time
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from pyspark.sql import SparkSession
+
 
 from utils_output import (
     show_rdd_result,
@@ -49,7 +50,8 @@ spark = (
     .appName("Q1_RDD_AA_DL_monthly_stats")
     .master(SPARK_MASTER)
     .config("spark.hadoop.fs.defaultFS", "hdfs://namenode:9000")
-    .config("spark.ui.enabled", "false")
+    .config("spark.ui.enabled", "true")
+    .config("spark.ui.port", "4040")
     .getOrCreate()
 )
 spark.sparkContext.setLogLevel("WARN")
@@ -196,5 +198,9 @@ print(f"CSV su HDFS: {HDFS_OUTPUT}")
 
 print(f"\nTempo Q1 (RDD API): {elapsed:.2f}s")
 print(f"{'='*70}\n")
+
+if os.getenv("SPARK_DEBUG_UI", "0") == "1":
+    print("\nSpark UI attiva. Apri http://localhost:4040 per vedere il DAG.")
+    input("Premi INVIO per terminare l'applicazione...")
 
 spark.stop()

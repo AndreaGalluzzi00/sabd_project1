@@ -33,8 +33,8 @@ from utils_output import (
 
 SPARK_MASTER = os.getenv("SPARK_MASTER","spark://spark-master:7077")
 HDFS_INPUT   = "hdfs://namenode:9000/sabd/processed/"
-HDFS_OUTPUT  = "hdfs://namenode:9000/sabd/results/q1/"
-LOCAL_OUT    = "/opt/spark/jobs/results/q1.csv"
+HDFS_OUTPUT  = "hdfs://namenode:9000/sabd/results/q1_df/"
+LOCAL_OUT    = "/opt/spark/jobs/results/q1_df.csv"
 
 os.makedirs(os.path.dirname(LOCAL_OUT), exist_ok=True)
 

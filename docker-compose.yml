@@ -42,7 +42,8 @@ services:
     command: /opt/spark/bin/spark-class org.apache.spark.deploy.master.Master
     ports:
       - "8080:8080"   # Web UI Spark Master
-      - "7077:7077"   # RPC Spark Master
+      - "7077:7077"
+      - "4040:4040"# RPC Spark Master
     volumes:
       - ./spark/jobs:/opt/spark/jobs
       - ./nifi/config:/opt/hadoop/conf
