@@ -16,10 +16,18 @@ Modalità:
   - Dev locale (Mac M1):  SPARK_MASTER=local[2]  (default)
   - Cluster / EC2:        SPARK_MASTER=spark://spark-master:7077
 """
-import csv
 import os
+import sys
 import time
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 from pyspark.sql import SparkSession
+
+from utils_output import (
+    show_rdd_result,
+    save_rdd_csv_local
+)
 
 SPARK_MASTER = os.getenv("SPARK_MASTER", "spark://spark-master:7077")
 HDFS_INPUT   = "hdfs://namenode:9000/sabd/processed/"
@@ -150,25 +158,23 @@ rows = [
 # ─────────────────────────────────────────────────────────────────────────────
 # Output a schermo + salvataggio CSV locale (dir montata → visibile sull'host)
 # ─────────────────────────────────────────────────────────────────────────────
-print(f"\n{'='*70}")
-print(f"Q1 (RDD) — RISULTATI  (tempo esecuzione: {elapsed:.2f}s)")
-print(f"{'='*70}")
-print("  ".join(HEADER))
-for row in rows:
-    print("  ".join(str(x) for x in row))
-
-with open(LOCAL_OUT, "w", newline="") as f:
-    writer = csv.writer(f)
-    writer.writerow(HEADER)
-    writer.writerows(rows)
-print(f"\nCSV locale: {LOCAL_OUT}")
+show_rdd_result(
+    rows=rows,
+    header=HEADER,
+    query_name="Q1 RDD",
+    elapsed=elapsed,
+)
+save_rdd_csv_local(
+    path=LOCAL_OUT,
+    header=HEADER,
+    rows=rows,
+)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Action #2: salvataggio su HDFS (riusa il risultato in cache → niente ricalcolo)
 # ─────────────────────────────────────────────────────────────────────────────
 sc = spark.sparkContext
-
-# saveAsTextFile NON sovrascrive: cancelliamo prima l'eventuale output esistente
+#Ho lasciato il salvataggio HDFS della versione RDD senza funzione generica, perché secondo me ha più senso mantenerlo “RDD puro”: invece di salvare partendo da rows già raccolte sul driver, salvo direttamente da result_rdd usando sortByKey(), map() e saveAsTextFile(). Le utility comuni le uso solo per stampa e CSV locale.# saveAsTextFile NON sovrascrive: cancelliamo prima l'eventuale output esistente
 # usando le API Hadoop FileSystem (equivalente di mode("overwrite") del writer DF).
 hadoop_conf = sc._jsc.hadoopConfiguration()
 fs = sc._jvm.org.apache.hadoop.fs.FileSystem.get(hadoop_conf)

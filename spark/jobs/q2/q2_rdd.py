@@ -19,11 +19,20 @@ Modalità:
   - Dev locale (Mac M1):  SPARK_MASTER=local[2]  (default)
   - Cluster / EC2:        SPARK_MASTER=spark://spark-master:7077
 """
-import csv
+
+import sys
 import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+
 import time
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col
+from utils_output import (
+    show_rdd_result,
+    save_rdd_csv_local
+)
+
 
 SPARK_MASTER = os.getenv("SPARK_MASTER", "spark://spark-master:7077")
 HDFS_INPUT   = "hdfs://namenode:9000/sabd/processed/"
@@ -164,19 +173,17 @@ rows = [[carrier, *metrics] for carrier, metrics in top]
 # ─────────────────────────────────────────────────────────────────────────────
 # Output a schermo + CSV locale (dir montata → visibile sull'host)
 # ─────────────────────────────────────────────────────────────────────────────
-print(f"\n{'='*70}")
-print(f"Q2 (RDD) — RISULTATI  (tempo esecuzione: {elapsed:.2f}s)")
-print(f"{'='*70}")
-print("  ".join(HEADER))
-for row in rows:
-    print("  ".join(str(x) for x in row))
-
-with open(LOCAL_OUT, "w", newline="") as f:
-    writer = csv.writer(f)
-    writer.writerow(HEADER)
-    writer.writerows(rows)
-print(f"\nCSV locale:  {LOCAL_OUT}")
-
+show_rdd_result(
+    rows=rows,
+    header=HEADER,
+    query_name="Q2 RDD",
+    elapsed=elapsed,
+)
+save_rdd_csv_local(
+    path=LOCAL_OUT,
+    header=HEADER,
+    rows=rows,
+)
 # ─────────────────────────────────────────────────────────────────────────────
 # HDFS: saveAsTextFile (coerente con q1_rdd.py — niente DataFrame writer)
 # ─────────────────────────────────────────────────────────────────────────────

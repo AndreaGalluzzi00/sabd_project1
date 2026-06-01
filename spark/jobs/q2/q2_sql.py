@@ -11,10 +11,18 @@ Modalità:
   - Dev locale:  SPARK_MASTER=local[2]  (default)
   - Cluster:     SPARK_MASTER=spark://spark-master:7077
 """
-import csv
 import os
+import sys
 import time
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from pyspark.sql import SparkSession
+
+from utils_output import (
+    show_dataframe_result,
+    save_csv_local,
+    save_dataframe_hdfs,
+)
 
 SPARK_MASTER = os.getenv("SPARK_MASTER","spark://spark-master:7077")
 HDFS_INPUT   = "hdfs://namenode:9000/sabd/processed/"
@@ -64,24 +72,14 @@ result.cache()
 rows = result.collect()
 elapsed = time.time() - t0
 
-# Output a schermo
-print(f"\n{'='*70}")
-print(f"Q2 SQL — RISULTATI  (tempo esecuzione: {elapsed:.2f}s)")
-print(f"{'='*70}")
-result.show(10, truncate=False)
+# ── Output a schermo
+show_dataframe_result(result, "Q2_SQL", elapsed, 20)
 
 # Salvataggio CSV locale
-cols = result.columns
-with open(LOCAL_OUT, "w", newline="") as f:
-    writer = csv.writer(f)
-    writer.writerow(cols)
-    for row in rows:
-        writer.writerow([row[c] for c in cols])
-print(f"CSV locale:  {LOCAL_OUT}")
+save_csv_local(LOCAL_OUT, result, rows)
 
 # Salvataggio su HDFS
-result.coalesce(1).write.mode("overwrite").option("header", "true").csv(HDFS_OUTPUT)
-print(f"CSV su HDFS: {HDFS_OUTPUT}")
+save_dataframe_hdfs(result, HDFS_OUTPUT)
 
 print(f"\nTempo Q2 (Spark SQL): {elapsed:.2f}s")
 print(f"{'='*70}\n")

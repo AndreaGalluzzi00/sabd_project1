@@ -9,13 +9,26 @@ Modalità:
   - Dev locale (Mac M1):  SPARK_MASTER=local[2]  (default)
   - Cluster / EC2:        SPARK_MASTER=spark://spark-master:7077
 """
-import csv
+"""
+Q1 — AA e DL: statistiche mensili DEP_DELAY e cancellation rate (gen-apr 2025)
+"""
+
 import os
+import sys
 import time
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import (
     col, avg, min as spark_min, max as spark_max,
     count, sum as spark_sum, when, round as spark_round,
+)
+
+from utils_output import (
+    show_dataframe_result,
+    save_csv_local,
+    save_dataframe_hdfs,
 )
 
 SPARK_MASTER = os.getenv("SPARK_MASTER","spark://spark-master:7077")
@@ -71,23 +84,13 @@ rows = result.collect()
 elapsed = time.time() - t0
 
 # Output a schermo
-print(f"\n{'='*70}")
-print(f"Q1 — RISULTATI  (tempo esecuzione: {elapsed:.2f}s)")
-print(f"{'='*70}")
-result.show(20, truncate=False)
+show_dataframe_result(result, "Q1", elapsed, 20)
 
 # Salvataggio CSV locale (directory montata → visibile sull'host)
-cols = result.columns
-with open(LOCAL_OUT, "w", newline="") as f:
-    writer = csv.writer(f)
-    writer.writerow(cols)
-    for row in rows:
-        writer.writerow([row[c] for c in cols])
-print(f"CSV locale:  {LOCAL_OUT}")
+save_csv_local(LOCAL_OUT, result, rows)
 
 # Salvataggio su HDFS
-result.coalesce(1).write.mode("overwrite").option("header", "true").csv(HDFS_OUTPUT)
-print(f"CSV su HDFS: {HDFS_OUTPUT}")
+save_dataframe_hdfs(result, HDFS_OUTPUT)
 
 print(f"\nTempo Q1 (DataFrame API): {elapsed:.2f}s")
 print(f"{'='*70}\n")
