@@ -1,5 +1,6 @@
 import csv
 import os
+import time
 
 
 
@@ -70,3 +71,50 @@ def save_rdd_csv_local(path, header, rows):
         writer.writerows(rows)
 
     print(f"CSV locale:  {path}")
+
+
+
+def save_rdd_csv_hdfs(sc, path, header, data_rdd, row_mapper=None, coalesce_one=True):
+    """
+    Salva un RDD su HDFS in formato CSV usando saveAsTextFile.
+
+    Stampa:
+      - path HDFS di output
+      - tempo della sola action saveAsTextFile.
+    """
+
+    # saveAsTextFile non sovrascrive: elimino prima la directory se esiste.
+    hadoop_conf = sc._jsc.hadoopConfiguration()
+    fs = sc._jvm.org.apache.hadoop.fs.FileSystem.get(hadoop_conf)
+    out_path = sc._jvm.org.apache.hadoop.fs.Path(path)
+
+    if fs.exists(out_path):
+        fs.delete(out_path, True)
+
+    header_rdd = sc.parallelize([",".join(header)])
+
+    if row_mapper is not None:
+        rows_rdd = data_rdd.map(row_mapper)
+    else:
+        rows_rdd = data_rdd
+
+    data_csv_rdd = rows_rdd.map(
+        lambda row: ",".join("" if x is None else str(x) for x in row)
+    )
+
+    output_rdd = header_rdd.union(data_csv_rdd)
+
+    if coalesce_one:
+        output_rdd = output_rdd.coalesce(1)
+
+    # Misuro SOLO la action di scrittura.
+    t_write = time.time()
+    output_rdd.saveAsTextFile(path)
+    write_elapsed = time.time() - t_write
+
+    print(f"CSV su HDFS: {path}")
+    print(f"Tempo saveAsTextFile: {write_elapsed:.2f}s")
+
+# Il tempo di salvataggio HDFS misura esclusivamente la durata della action
+# saveAsTextFile; la cancellazione dell'output precedente non viene inclusa
+# nella metrica di scrittura.

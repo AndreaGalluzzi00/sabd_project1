@@ -10,27 +10,34 @@ Metriche:    num_flights, avg_arr_delay, media delle 5 cause di ritardo
 NULL cause:  trattati come 0 (BTS li omette quando delay totale < 15min)
 Ordine:      top-10 per avg_arr_delay decrescente
 
-Pipeline RDD (tutta lazy, una sola action pesante):
+Pipeline RDD:
   read parquet → filter(base) → .rdd → map(to_pair) → reduceByKey(combine)
-  → mapValues(finalize) → filter(>=500) → collect()  ← action
-La top-10 (ordinamento + limit) è fatta in Python sul driver: poche compagnie.
+  → mapValues(finalize) → filter(>=500) → takeOrdered(TOP_N)  ← action pesante
+
+La top-10 viene calcolata tramite takeOrdered: Spark non porta tutto il risultato
+aggregato sul driver, ma solo i migliori TOP_N elementi finali.
+
+Per il salvataggio HDFS, la top-10 viene trasformata in un piccolo RDD e salvata
+con saveAsTextFile tramite utility comune, mantenendo lo stile RDD di q1_rdd.py.
 
 Modalità:
   - Dev locale (Mac M1):  SPARK_MASTER=local[2]  (default)
   - Cluster / EC2:        SPARK_MASTER=spark://spark-master:7077
 """
 
-import sys
 import os
+import sys
+import time
+
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-
-import time
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col
+
 from utils_output import (
     show_rdd_result,
-    save_rdd_csv_local
+    save_rdd_csv_local,
+    save_rdd_csv_hdfs,
 )
 
 
@@ -60,7 +67,10 @@ spark = (
     .config("spark.ui.port", "4040")
     .getOrCreate()
 )
-spark.sparkContext.setLogLevel("WARN")
+
+sc = spark.sparkContext
+
+sc.setLogLevel("WARN")
 print(f"Master: {SPARK_MASTER}")
 
 
@@ -78,22 +88,26 @@ def to_pair(r):
 
     CHIAVE = OP_UNIQUE_CARRIER   ← il GROUP BY di Q2
     VALORE = (total, arr_sum, arr_n, carrier, weather, nas, security, late)
-      - total          : conta TUTTI i voli del filtro base (denominatore cause)
+
+      - total          : conta TUTTI i voli del filtro base
       - arr_sum/arr_n  : solo ARR_DELAY non-null → avg_arr_delay ignora i null,
                          come AVG() in DataFrame/SQL
-      - le 5 cause     : NULL→0, sommate sul totale dei voli (coalesce)
+      - le 5 cause     : NULL→0, sommate sul totale dei voli
 
-    Il valore ha già la forma dell'aggregato finale (combiner pattern), così
-    reduceByKey può combinare due valori con la stessa funzione.
+    Il valore ha già la forma dell'aggregato finale, così reduceByKey può
+    combinare due valori con la stessa funzione.
     """
     arr = r["ARR_DELAY"]
+
     if arr is not None:
         arr_sum, arr_n = float(arr), 1
     else:
         arr_sum, arr_n = 0.0, 0
 
     return r["OP_UNIQUE_CARRIER"], (
-        1, arr_sum, arr_n,
+        1,
+        arr_sum,
+        arr_n,
         _zero(r["CARRIER_DELAY"]),
         _zero(r["WEATHER_DELAY"]),
         _zero(r["NAS_DELAY"]),
@@ -103,7 +117,7 @@ def to_pair(r):
 
 
 def combine(a, b):
-    """Fonde due aggregati parziali della stessa compagnia (associativo + commutativo)."""
+    """Fonde due aggregati parziali della stessa compagnia."""
     return (
         a[0] + b[0],   # total
         a[1] + b[1],   # arr_sum
@@ -117,9 +131,11 @@ def combine(a, b):
 
 
 def finalize(v):
-    """Aggregato grezzo → metriche finali (medie: operazioni non associative)."""
+    """Aggregato grezzo → metriche finali."""
     total, arr_sum, arr_n, carrier, weather, nas, security, late = v
+
     avg_arr = round(arr_sum / arr_n, 4) if arr_n > 0 else None
+
     return (
         total,
         avg_arr,
@@ -131,48 +147,79 @@ def finalize(v):
     )
 
 
+def top_key(kv):
+    """Chiave di ordinamento per takeOrdered.
+
+    takeOrdered ordina in modo crescente.
+    Per ottenere avg_arr_delay decrescente usiamo il valore negativo.
+
+    Esempio:
+      avg_arr_delay = 20 → key = -20
+      avg_arr_delay = 10 → key = -10
+
+    Ordinando crescente, -20 viene prima di -10, quindi il delay maggiore
+    finisce in cima.
+
+    Se avg_arr_delay è None, assegniamo +inf così finisce in fondo.
+    """
+    avg_arr_delay = kv[1][1]
+    return -avg_arr_delay if avg_arr_delay is not None else float("inf")
+
+
 # ─────────────────────────────────────────────────────────────────────────────
-# Pipeline lazy — nessun calcolo finché non scatta l'action finale
+# Pipeline lazy — nessun calcolo finché non scatta l'action
 # ─────────────────────────────────────────────────────────────────────────────
-# Filtro base sul DataFrame (predicate pushdown) + column pruning del Parquet,
-# poi passaggio all'RDD: map/reduceByKey/mapValues/filter sono tutte lazy.
-df = (
+# Filtro base sul DataFrame per sfruttare predicate pushdown e column pruning
+# del Parquet; poi passaggio all'RDD.
+base_df = (
     spark.read.parquet(HDFS_INPUT)
     .filter((col("CANCELLED") == 0) & (col("DIVERTED") == 0))
     .select(
-        "OP_UNIQUE_CARRIER", "ARR_DELAY",
-        "CARRIER_DELAY", "WEATHER_DELAY", "NAS_DELAY",
-        "SECURITY_DELAY", "LATE_AIRCRAFT_DELAY",
+        "OP_UNIQUE_CARRIER",
+        "ARR_DELAY",
+        "CARRIER_DELAY",
+        "WEATHER_DELAY",
+        "NAS_DELAY",
+        "SECURITY_DELAY",
+        "LATE_AIRCRAFT_DELAY",
     )
 )
 
-aggregated = (
-    df.rdd
-    .map(to_pair)                                    # → (carrier, parziale)
-    .reduceByKey(combine)                            # SHUFFLE + map-side combine
-    .mapValues(finalize)                             # medie finali (no shuffle)
-    .filter(lambda kv: kv[1][0] >= MIN_FLIGHTS)      # soglia >= 500 voli
+rdd = (
+    base_df.rdd
+    .map(to_pair)
+    .reduceByKey(combine)
+    .mapValues(finalize)
+    .filter(lambda kv: kv[1][0] >= MIN_FLIGHTS)
 )
 
+
 # ─────────────────────────────────────────────────────────────────────────────
-# Action: collect() → risultato minuscolo (≈14 compagnie) + misura del tempo
+# Action: takeOrdered() → calcola direttamente la top-10
 # ─────────────────────────────────────────────────────────────────────────────
+# A differenza di collect() + sorted(), qui Spark non porta tutto il risultato
+# aggregato sul driver: restituisce solo i TOP_N elementi migliori.
 t0 = time.time()
-collected = aggregated.collect()
+
+top = rdd.takeOrdered(
+    TOP_N,
+    key=top_key,
+)
+
 elapsed = time.time() - t0
 
-# Top-10 per avg_arr_delay decrescente (sul driver: pochi elementi → niente
-# sortBy distribuito). avg_arr None (mai per i top) finisce in fondo.
-top = sorted(
-    collected,
-    key=lambda kv: kv[1][1] if kv[1][1] is not None else float("-inf"),
-    reverse=True,
-)[:TOP_N]
+# Versione piatta per stampa e CSV locale.
+rows = [
+    [carrier, *metrics]
+    for carrier, metrics in top
+]
 
-rows = [[carrier, *metrics] for carrier, metrics in top]
+# RDD finale piccolo, usato solo per il salvataggio HDFS in stile RDD.
+top_rdd = sc.parallelize(top, numSlices=1)
+
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Output a schermo + CSV locale (dir montata → visibile sull'host)
+# Output a schermo + CSV locale
 # ─────────────────────────────────────────────────────────────────────────────
 show_rdd_result(
     rows=rows,
@@ -180,31 +227,28 @@ show_rdd_result(
     query_name="Q2 RDD",
     elapsed=elapsed,
 )
+
 save_rdd_csv_local(
     path=LOCAL_OUT,
     header=HEADER,
     rows=rows,
 )
+
+
 # ─────────────────────────────────────────────────────────────────────────────
-# HDFS: saveAsTextFile (coerente con q1_rdd.py — niente DataFrame writer)
+# HDFS: salvataggio RDD con saveAsTextFile tramite utility comune
 # ─────────────────────────────────────────────────────────────────────────────
-sc = spark.sparkContext
+save_rdd_csv_hdfs(
+    sc=sc,
+    path=HDFS_OUTPUT,
+    header=HEADER,
+    data_rdd=top_rdd,
+    row_mapper=lambda kv: [
+        kv[0],
+        *kv[1],
+    ],
+)
 
-# saveAsTextFile NON sovrascrive: cancelliamo prima l'eventuale output esistente
-# con le API Hadoop FileSystem (equivalente di mode("overwrite") del writer DF).
-hadoop_conf = sc._jsc.hadoopConfiguration()
-fs = sc._jvm.org.apache.hadoop.fs.FileSystem.get(hadoop_conf)
-out_path = sc._jvm.org.apache.hadoop.fs.Path(HDFS_OUTPUT)
-if fs.exists(out_path):
-    fs.delete(out_path, True)  # True = ricorsivo (è una directory)
-
-# Header come prima riga di un RDD a singola partizione → un solo file part-00000
-# con le righe nell'ordine della top-10.
-lines = [",".join(HEADER)] + [",".join(str(x) for x in row) for row in rows]
-sc.parallelize(lines, numSlices=1).saveAsTextFile(HDFS_OUTPUT)
-print(f"CSV su HDFS: {HDFS_OUTPUT}")
-
-print(f"\nTempo Q2 (RDD API): {elapsed:.2f}s")
 print(f"{'='*70}\n")
 
 if os.getenv("SPARK_DEBUG_UI", "0") == "1":

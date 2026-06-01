@@ -27,7 +27,8 @@ from pyspark.sql import SparkSession
 
 from utils_output import (
     show_rdd_result,
-    save_rdd_csv_local
+    save_rdd_csv_local,
+    save_rdd_csv_hdfs
 )
 
 SPARK_MASTER = os.getenv("SPARK_MASTER", "spark://spark-master:7077")
@@ -54,7 +55,8 @@ spark = (
     .config("spark.ui.port", "4040")
     .getOrCreate()
 )
-spark.sparkContext.setLogLevel("WARN")
+sc = spark.sparkContext
+sc.setLogLevel("WARN")
 print(f"Master: {SPARK_MASTER}")
 
 
@@ -175,28 +177,18 @@ save_rdd_csv_local(
 # ─────────────────────────────────────────────────────────────────────────────
 # Action #2: salvataggio su HDFS (riusa il risultato in cache → niente ricalcolo)
 # ─────────────────────────────────────────────────────────────────────────────
-sc = spark.sparkContext
-#Ho lasciato il salvataggio HDFS della versione RDD senza funzione generica, perché secondo me ha più senso mantenerlo “RDD puro”: invece di salvare partendo da rows già raccolte sul driver, salvo direttamente da result_rdd usando sortByKey(), map() e saveAsTextFile(). Le utility comuni le uso solo per stampa e CSV locale.# saveAsTextFile NON sovrascrive: cancelliamo prima l'eventuale output esistente
-# usando le API Hadoop FileSystem (equivalente di mode("overwrite") del writer DF).
-hadoop_conf = sc._jsc.hadoopConfiguration()
-fs = sc._jvm.org.apache.hadoop.fs.FileSystem.get(hadoop_conf)
-out_path = sc._jvm.org.apache.hadoop.fs.Path(HDFS_OUTPUT)
-if fs.exists(out_path):
-    fs.delete(out_path, True)  # True = ricorsivo (è una directory)
-
-# Una riga CSV per gruppo, ordinata per chiave (sortByKey opera sui dati in cache).
-# Anteponiamo l'header come prima riga via union, poi coalesce(1) per ottenere
-# un UNICO file part-00000 nella directory di output (come coalesce(1) del DF writer).
-header_rdd = sc.parallelize([",".join(HEADER)])
-data_rdd = (
-    result_rdd
-    .sortByKey()
-    .map(lambda kv: ",".join(str(x) for x in [kv[0][0], kv[0][1], kv[0][2], *kv[1]]))
+save_rdd_csv_hdfs(
+    sc=spark.sparkContext,
+    path=HDFS_OUTPUT,
+    header=HEADER,
+    data_rdd=result_rdd.sortByKey(),
+    row_mapper=lambda kv: [
+        kv[0][0],
+        kv[0][1],
+        kv[0][2],
+        *kv[1],
+    ],
 )
-header_rdd.union(data_rdd).coalesce(1).saveAsTextFile(HDFS_OUTPUT)
-print(f"CSV su HDFS: {HDFS_OUTPUT}")
-
-print(f"\nTempo Q1 (RDD API): {elapsed:.2f}s")
 print(f"{'='*70}\n")
 
 if os.getenv("SPARK_DEBUG_UI", "0") == "1":

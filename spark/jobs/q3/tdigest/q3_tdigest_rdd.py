@@ -28,6 +28,7 @@ from tdigest import TDigest
 from utils_output import (
     show_rdd_result,
     save_rdd_csv_local,
+    save_rdd_csv_hdfs
 )
 
 SPARK_MASTER            = os.getenv("SPARK_MASTER", "spark://spark-master:7077")
@@ -51,7 +52,8 @@ spark = (
     .config("spark.ui.port", "4040")
     .getOrCreate()
 )
-spark.sparkContext.setLogLevel("WARN")
+sc = spark.sparkContext
+sc.setLogLevel("WARN")
 print(f"Master: {SPARK_MASTER}")
 
 df = (
@@ -123,6 +125,8 @@ range_rdd = (
     .map(lambda kv: (kv[0], kv[1][0], kv[1][1]))
     .sortBy(lambda x: x[0])
 )
+percentile_rdd.cache()
+range_rdd.cache()
 
 percentile_rows = percentile_rdd.collect()
 range_rows = range_rdd.collect()
@@ -162,35 +166,24 @@ save_rdd_csv_local(
 # ─────────────────────────────────────────────────────────────────────────────
 # HDFS: salvataggio RDD puro con saveAsTextFile
 # ─────────────────────────────────────────────────────────────────────────────
-sc = spark.sparkContext
-
-hadoop_conf = sc._jsc.hadoopConfiguration()
-fs = sc._jvm.org.apache.hadoop.fs.FileSystem.get(hadoop_conf)
-
-out_percentiles = sc._jvm.org.apache.hadoop.fs.Path(HDFS_OUTPUT_PERCENTILES)
-out_range = sc._jvm.org.apache.hadoop.fs.Path(HDFS_OUTPUT_RANGE)
-
-if fs.exists(out_percentiles):
-    fs.delete(out_percentiles, True)
-
-if fs.exists(out_range):
-    fs.delete(out_range, True)
-
-percentile_lines = (
-    [",".join(COLS_PERC)] +
-    [",".join(str(x) for x in row) for row in percentile_rows]
+# ─────────────────────────────────────────────────────────────────────────────
+# HDFS: salvataggio RDD con saveAsTextFile tramite utility comune
+# ─────────────────────────────────────────────────────────────────────────────
+save_rdd_csv_hdfs(
+    sc=sc,
+    path=HDFS_OUTPUT_PERCENTILES,
+    header=COLS_PERC,
+    data_rdd=percentile_rdd,
+    row_mapper=lambda row: row,
 )
 
-range_lines = (
-    [",".join(COLS_RANGE)] +
-    [",".join(str(x) for x in row) for row in range_rows]
+save_rdd_csv_hdfs(
+    sc=sc,
+    path=HDFS_OUTPUT_RANGE,
+    header=COLS_RANGE,
+    data_rdd=range_rdd,
+    row_mapper=lambda row: row,
 )
-
-sc.parallelize(percentile_lines, numSlices=1).saveAsTextFile(HDFS_OUTPUT_PERCENTILES)
-sc.parallelize(range_lines, numSlices=1).saveAsTextFile(HDFS_OUTPUT_RANGE)
-
-print(f"CSV su HDFS: {HDFS_OUTPUT_PERCENTILES}")
-print(f"CSV su HDFS: {HDFS_OUTPUT_RANGE}")
 
 print(f"\nTempo Q3 t-digest RDD: {elapsed:.2f}s")
 print(f"{'=' * 70}\n")

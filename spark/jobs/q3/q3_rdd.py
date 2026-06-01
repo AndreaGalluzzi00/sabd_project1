@@ -34,7 +34,8 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from utils_output import (
     show_rdd_result,
-    save_rdd_csv_local
+    save_rdd_csv_local,
+    save_rdd_csv_hdfs,
 )
 
 SPARK_MASTER            = os.getenv("SPARK_MASTER", "spark://spark-master:7077")
@@ -59,7 +60,8 @@ spark = (
     .config("spark.ui.port", "4040")
     .getOrCreate()
 )
-spark.sparkContext.setLogLevel("WARN")
+sc = spark.sparkContext
+sc.setLogLevel("WARN")
 print(f"Master: {SPARK_MASTER}")
 
 df = (
@@ -122,7 +124,7 @@ percentile_rdd = (
     .sortBy(lambda x: (x[0], x[1]))
 )
 
-# Min/Max DEP_DELAY per compagnia (esatto, reduceByKey).
+# Min/Max DEP_DELAY per compagnia.
 range_rdd = (
     base
     .map(lambda t: (t[0], (t[2], t[2])))
@@ -130,11 +132,13 @@ range_rdd = (
     .sortByKey()
 )
 
+percentile_rdd.cache()
+range_rdd.cache()
+
 percentile_rows = percentile_rdd.collect()
 range_rows = [(c, mn, mx) for c, (mn, mx) in range_rdd.collect()]
 elapsed = time.time() - t0
 
-# ── Output ────────────────────────────────────────────────────────────────────
 show_rdd_result(
     rows=percentile_rows,
     header=COLS_PERC,
@@ -149,7 +153,6 @@ show_rdd_result(
     elapsed=elapsed,
 )
 
-# ── CSV locale ────────────────────────────────────────────────────────────────
 save_rdd_csv_local(
     path=LOCAL_OUT_PERCENTILES,
     header=COLS_PERC,
@@ -162,49 +165,25 @@ save_rdd_csv_local(
     rows=range_rows,
 )
 
-
-# ── HDFS ──────────────────────────────────────────────────────────────────────
-# ─────────────────────────────────────────────────────────────────────────────
-# HDFS: salvataggio RDD puro con saveAsTextFile
-# ─────────────────────────────────────────────────────────────────────────────
-sc = spark.sparkContext
-
-# saveAsTextFile NON sovrascrive: cancelliamo prima eventuali output esistenti
-# usando le API Hadoop FileSystem, come già fatto nelle altre versioni RDD.
-hadoop_conf = sc._jsc.hadoopConfiguration()
-fs = sc._jvm.org.apache.hadoop.fs.FileSystem.get(hadoop_conf)
-
-out_percentiles = sc._jvm.org.apache.hadoop.fs.Path(HDFS_OUTPUT_PERCENTILES)
-out_range = sc._jvm.org.apache.hadoop.fs.Path(HDFS_OUTPUT_RANGE)
-
-if fs.exists(out_percentiles):
-    fs.delete(out_percentiles, True)
-
-if fs.exists(out_range):
-    fs.delete(out_range, True)
-
-# Costruzione delle righe CSV.
-percentile_lines = (
-    [",".join(COLS_PERC)] +
-    [",".join(str(x) for x in row) for row in percentile_rows]
+save_rdd_csv_hdfs(
+    sc=sc,
+    path=HDFS_OUTPUT_PERCENTILES,
+    header=COLS_PERC,
+    data_rdd=percentile_rdd,
+    row_mapper=lambda row: row,
 )
 
-range_lines = (
-    [",".join(COLS_RANGE)] +
-    [",".join(str(x) for x in row) for row in range_rows]
+save_rdd_csv_hdfs(
+    sc=sc,
+    path=HDFS_OUTPUT_RANGE,
+    header=COLS_RANGE,
+    data_rdd=range_rdd,
+    row_mapper=lambda kv: [
+        kv[0],
+        kv[1][0],
+        kv[1][1],
+    ],
 )
 
-# Un solo part-file per ciascun output.
-sc.parallelize(percentile_lines, numSlices=1).saveAsTextFile(HDFS_OUTPUT_PERCENTILES)
-sc.parallelize(range_lines, numSlices=1).saveAsTextFile(HDFS_OUTPUT_RANGE)
-
-print(f"CSV su HDFS: {HDFS_OUTPUT_PERCENTILES}")
-print(f"CSV su HDFS: {HDFS_OUTPUT_RANGE}")
-print(f"\nTempo Q3 (RDD, esatto): {elapsed:.2f}s")
+print(f"\nTempo Q3 query/calcolo (RDD, esatto): {elapsed:.2f}s")
 print(f"{'='*70}\n")
-
-if os.getenv("SPARK_DEBUG_UI", "0") == "1":
-    print("\nSpark UI attiva. Apri http://localhost:4040 per vedere il DAG.")
-    input("Premi INVIO per terminare l'applicazione...")
-
-spark.stop()
