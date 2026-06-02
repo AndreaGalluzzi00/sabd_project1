@@ -56,6 +56,17 @@ Q3_PCT_PATH     = f"{HDFS_RESULTS}/q3_rdd/percentiles"
 Q3_RNG_PATH     = f"{HDFS_RESULTS}/q3_rdd/delay_range"
 CLUSTERING_PATH = f"{HDFS_RESULTS}/clustering_base"
 
+# Schema dei CSV RDD su HDFS (gli output saveAsTextFile non hanno un header
+# affidabile su più part-file → lo passiamo esplicito, vedi read_csv).
+COLS_Q1     = ["OP_UNIQUE_CARRIER", "YEAR", "MONTH", "total_flights",
+               "cancelled_flights", "cancellation_rate_pct",
+               "avg_dep_delay", "min_dep_delay", "max_dep_delay"]
+COLS_Q2     = ["OP_UNIQUE_CARRIER", "num_flights", "avg_arr_delay",
+               "avg_carrier_delay", "avg_weather_delay", "avg_nas_delay",
+               "avg_security_delay", "avg_late_aircraft_delay"]
+COLS_Q3_PCT = ["OP_UNIQUE_CARRIER", "hour", "p25", "p50", "p75", "p90"]
+COLS_Q3_RNG = ["OP_UNIQUE_CARRIER", "min_delay", "max_delay"]
+
 MONTH_LABELS = {"1": "Jan", "2": "Feb", "3": "Mar", "4": "Apr"}
 
 
@@ -75,8 +86,14 @@ def hdfs_exists(spark, path: str) -> bool:
     return fs.exists(jvm.org.apache.hadoop.fs.Path(path))
 
 
-def read_csv(spark, path: str) -> list[dict]:
-    """Legge una directory CSV (con header) da HDFS → lista di dict {colonna: str}.
+def read_csv(spark, path: str, columns: list[str] | None = None) -> list[dict]:
+    """Legge una directory CSV da HDFS → lista di dict {colonna: str}.
+
+    Gli output RDD (saveAsTextFile) scrivono l'header come semplice riga di
+    testo: con più part-file Spark non sa quale sia l'header, quindi passiamo
+    `columns` esplicite (header=False) e scartiamo le righe-header eventualmente
+    finite tra i dati. Gli output DataFrame (clustering) hanno un header
+    affidabile → columns=None.
 
     I valori restano stringhe (come csv.DictReader); i null diventano "".
     Ritorna [] se il path non esiste su HDFS.
@@ -84,11 +101,22 @@ def read_csv(spark, path: str) -> list[dict]:
     if not hdfs_exists(spark, path):
         print(f"  [SKIP] {path} non trovato su HDFS")
         return []
-    df = spark.read.csv(path, header=True)
-    return [
-        {k: ("" if v is None else v) for k, v in row.asDict().items()}
-        for row in df.collect()
-    ]
+
+    if columns is None:
+        df = spark.read.csv(path, header=True)
+        return [
+            {k: ("" if v is None else v) for k, v in row.asDict().items()}
+            for row in df.collect()
+        ]
+
+    df = spark.read.csv(path, header=False)
+    rows: list[dict] = []
+    for row in df.collect():
+        rec = {c: ("" if v is None else v) for c, v in zip(columns, row)}
+        if rec.get(columns[0]) == columns[0]:   # riga header finita tra i dati
+            continue
+        rows.append(rec)
+    return rows
 
 
 # ── Q1 ────────────────────────────────────────────────────────────────────────
@@ -280,11 +308,11 @@ def main():
         r = connect()
 
         print("Lettura risultati RDD da HDFS…")
-        q1_rows     = read_csv(spark, Q1_PATH)
-        q2_rows     = read_csv(spark, Q2_PATH)
-        q3_pct_rows = read_csv(spark, Q3_PCT_PATH)
-        q3_rng_rows = read_csv(spark, Q3_RNG_PATH)
-        clust_rows  = read_csv(spark, CLUSTERING_PATH)
+        q1_rows     = read_csv(spark, Q1_PATH, COLS_Q1)
+        q2_rows     = read_csv(spark, Q2_PATH, COLS_Q2)
+        q3_pct_rows = read_csv(spark, Q3_PCT_PATH, COLS_Q3_PCT)
+        q3_rng_rows = read_csv(spark, Q3_RNG_PATH, COLS_Q3_RNG)
+        clust_rows  = read_csv(spark, CLUSTERING_PATH)   # header DataFrame affidabile
 
         n = export_q1(r, q1_rows)
         print(f"Q1: {n} keys written  (pattern: q1:{{carrier}}:{{year}}:{{month}})")

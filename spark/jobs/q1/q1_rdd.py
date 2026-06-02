@@ -171,7 +171,7 @@ save_rdd_csv_local(
 # Action #2: salvataggio su HDFS (riusa il risultato in cache → niente ricalcolo)
 # ─────────────────────────────────────────────────────────────────────────────
 save_rdd_csv_hdfs(
-    sc=spark.sparkContext,
+    sc=sc,
     path=HDFS_OUTPUT,
     header=HEADER,
     data_rdd=result_rdd.sortByKey(),
