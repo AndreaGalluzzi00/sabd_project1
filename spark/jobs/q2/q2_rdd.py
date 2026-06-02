@@ -12,10 +12,14 @@ Ordine:      top-10 per avg_arr_delay decrescente
 
 Pipeline RDD:
   read parquet → filter(base) → .rdd → map(to_pair) → reduceByKey(combine)
-  → mapValues(finalize) → filter(>=500) → takeOrdered(TOP_N)  ← action pesante
+  → mapValues(finalize) → filter(>=500) → takeOrdered(TOP_N)  ← action
 
-La top-10 viene calcolata tramite takeOrdered: Spark non porta tutto il risultato
-aggregato sul driver, ma solo i migliori TOP_N elementi finali.
+Il costo dominante è a monte (scan Parquet + shuffle di reduceByKey); takeOrdered
+in sé è leggero. Lo usiamo come analogo RDD di ORDER BY ... LIMIT delle versioni
+DataFrame/SQL: è il pattern corretto e scalabile (top-N distribuito, niente
+collect dell'intero risultato sul driver). In Q2 il vantaggio è marginale, perché
+la cardinalità di OP_UNIQUE_CARRIER è ~15-20 compagnie, ma mantiene la coerenza
+tra le tre implementazioni.
 
 Per il salvataggio HDFS, la top-10 viene trasformata in un piccolo RDD e salvata
 con saveAsTextFile tramite utility comune, mantenendo lo stile RDD di q1_rdd.py.
@@ -197,8 +201,11 @@ rdd = (
 # ─────────────────────────────────────────────────────────────────────────────
 # Action: takeOrdered() → calcola direttamente la top-10
 # ─────────────────────────────────────────────────────────────────────────────
-# A differenza di collect() + sorted(), qui Spark non porta tutto il risultato
-# aggregato sul driver: restituisce solo i TOP_N elementi migliori.
+# Questa action fa scattare l'intera pipeline (il peso è lo scan Parquet + lo
+# shuffle di reduceByKey, non il takeOrdered). Rispetto a collect() + sorted(),
+# takeOrdered tiene su ogni partizione solo i TOP_N migliori e li fonde sul
+# driver: in Q2 il risparmio è trascurabile (l'RDD aggregato ha ~15-20 righe),
+# ma è l'analogo RDD di ORDER BY ... LIMIT e resta coerente con DataFrame/SQL.
 t0 = time.time()
 
 top = rdd.takeOrdered(
