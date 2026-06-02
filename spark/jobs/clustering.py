@@ -30,6 +30,7 @@ Modalità:
 """
 import csv
 import os
+import sys
 import time
 
 import matplotlib
@@ -46,6 +47,10 @@ from pyspark.ml import Pipeline
 from pyspark.ml.feature import VectorAssembler, StandardScaler, PCA
 from pyspark.ml.clustering import KMeans
 from pyspark.ml.evaluation import ClusteringEvaluator
+
+# jobs/utils in testa a sys.path: utils.py/utils_output.py vivono lì (cartella
+# senza __init__.py); senza questo `from utils import ...` non risolve.
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "utils"))
 
 from utils import build_spark_session
 
