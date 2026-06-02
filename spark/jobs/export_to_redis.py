@@ -4,6 +4,10 @@ Export query results to Redis.
 Reads the CSVs produced by q1/q2/q3 jobs (from /opt/spark/jobs/results/)
 and writes them to Redis using appropriate data structures.
 
+Ogni job scrive un CSV per implementazione (es. q1_rdd.csv, q2_sql.csv,
+q3_percentiles_kll.csv, …). Quale variante esportare è scelto da IMPL
+(default "rdd", l'implementazione esatta di riferimento).
+
 Key schema
 ----------
 Q1  HASH  q1:{carrier}:{year}:{month}
@@ -26,8 +30,10 @@ Usage (inside spark-master container):
   python /opt/spark/jobs/export_to_redis.py
 
 Environment variables:
-  REDIS_HOST  (default: redis)
-  REDIS_PORT  (default: 6379)
+  REDIS_HOST           (default: redis)
+  REDIS_PORT           (default: 6379)
+  IMPL                 (default: rdd)   q1/q2: rdd|df|sql — q3: +kll|tdigest
+  CLUSTERING_VARIANT   (default: base)  base (8 feature) | extended (12 feature)
 """
 
 from __future__ import annotations
@@ -41,10 +47,26 @@ REDIS_HOST = os.getenv("REDIS_HOST", "redis")
 REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
 
 RESULTS_DIR = "/opt/spark/jobs/results"
-Q1_CSV      = os.path.join(RESULTS_DIR, "q1.csv")
-Q2_CSV      = os.path.join(RESULTS_DIR, "q2.csv")
-Q3_PCT_CSV  = os.path.join(RESULTS_DIR, "q3_percentiles.csv")
-Q3_RNG_CSV  = os.path.join(RESULTS_DIR, "q3_delay_range.csv")
+
+# Implementazione da esportare verso Redis (ogni job produce un CSV per variante).
+#   Q1/Q2 : "rdd" | "df" | "sql"
+#   Q3    : "rdd" | "df" | "sql" | "kll" | "tdigest"
+# Default "rdd" = implementazione esatta, usata come riferimento.
+IMPL = os.getenv("IMPL", "rdd")
+VALID_IMPL = {"rdd", "df", "sql", "kll", "tdigest"}
+if IMPL not in VALID_IMPL:
+    raise SystemExit(f"IMPL='{IMPL}' non valido — scegli tra {sorted(VALID_IMPL)}")
+
+Q1_CSV = os.path.join(RESULTS_DIR, f"q1_{IMPL}.csv")
+Q2_CSV = os.path.join(RESULTS_DIR, f"q2_{IMPL}.csv")
+
+# Q3: la variante DF usa "q3_df_<metric>.csv", le altre "q3_<metric>_<impl>.csv".
+if IMPL == "df":
+    Q3_PCT_CSV = os.path.join(RESULTS_DIR, "q3_df_percentiles.csv")
+    Q3_RNG_CSV = os.path.join(RESULTS_DIR, "q3_df_delay_range.csv")
+else:
+    Q3_PCT_CSV = os.path.join(RESULTS_DIR, f"q3_percentiles_{IMPL}.csv")
+    Q3_RNG_CSV = os.path.join(RESULTS_DIR, f"q3_delay_range_{IMPL}.csv")
 
 MONTH_LABELS = {"1": "Jan", "2": "Feb", "3": "Mar", "4": "Apr"}
 
@@ -59,6 +81,9 @@ def connect() -> redis.Redis:
 # ── Q1 ────────────────────────────────────────────────────────────────────────
 
 def export_q1(r: redis.Redis) -> int:
+    if not os.path.exists(Q1_CSV):
+        print(f"  [SKIP] {os.path.basename(Q1_CSV)} non trovato")
+        return 0
     written = 0
     with open(Q1_CSV, newline="") as f:
         for row in csv.DictReader(f):
@@ -81,6 +106,9 @@ def export_q1(r: redis.Redis) -> int:
 # ── Q2 ────────────────────────────────────────────────────────────────────────
 
 def export_q2(r: redis.Redis) -> int:
+    if not os.path.exists(Q2_CSV):
+        print(f"  [SKIP] {os.path.basename(Q2_CSV)} non trovato")
+        return 0
     written = 0
     with open(Q2_CSV, newline="") as f:
         for row in csv.DictReader(f):
@@ -108,28 +136,34 @@ def export_q2(r: redis.Redis) -> int:
 
 def export_q3(r: redis.Redis) -> tuple[int, int]:
     pct_written = 0
-    with open(Q3_PCT_CSV, newline="") as f:
-        for row in csv.DictReader(f):
-            carrier = row["OP_UNIQUE_CARRIER"]
-            hour    = row["hour"]
-            key     = f"q3:percentiles:{carrier}:{hour}"
-            r.hset(key, mapping={
-                "p25": row["p25"],
-                "p50": row["p50"],
-                "p75": row["p75"],
-                "p90": row["p90"],
-            })
-            pct_written += 1
+    if os.path.exists(Q3_PCT_CSV):
+        with open(Q3_PCT_CSV, newline="") as f:
+            for row in csv.DictReader(f):
+                carrier = row["OP_UNIQUE_CARRIER"]
+                hour    = row["hour"]
+                key     = f"q3:percentiles:{carrier}:{hour}"
+                r.hset(key, mapping={
+                    "p25": row["p25"],
+                    "p50": row["p50"],
+                    "p75": row["p75"],
+                    "p90": row["p90"],
+                })
+                pct_written += 1
+    else:
+        print(f"  [SKIP] {os.path.basename(Q3_PCT_CSV)} non trovato")
 
     rng_written = 0
-    with open(Q3_RNG_CSV, newline="") as f:
-        for row in csv.DictReader(f):
-            carrier = row["OP_UNIQUE_CARRIER"]
-            r.hset(f"q3:range:{carrier}", mapping={
-                "min_delay": row["min_delay"],
-                "max_delay": row["max_delay"],
-            })
-            rng_written += 1
+    if os.path.exists(Q3_RNG_CSV):
+        with open(Q3_RNG_CSV, newline="") as f:
+            for row in csv.DictReader(f):
+                carrier = row["OP_UNIQUE_CARRIER"]
+                r.hset(f"q3:range:{carrier}", mapping={
+                    "min_delay": row["min_delay"],
+                    "max_delay": row["max_delay"],
+                })
+                rng_written += 1
+    else:
+        print(f"  [SKIP] {os.path.basename(Q3_RNG_CSV)} non trovato")
 
     return pct_written, rng_written
 
@@ -159,43 +193,46 @@ def export_grafana_viz(r: redis.Redis) -> None:
     """Crea chiavi Redis aggregate per le dashboard Grafana."""
 
     # ── Q1 ────────────────────────────────────────────────────────────────────
-    with open(Q1_CSV, newline="") as f:
-        for row in csv.DictReader(f):
-            carrier = row["OP_UNIQUE_CARRIER"]
-            month   = MONTH_LABELS.get(row["MONTH"], row["MONTH"])
-            r.hset(f"q1:viz:{carrier}:avg_dep_delay",     month, row["avg_dep_delay"])
-            r.hset(f"q1:viz:{carrier}:cancellation_rate", month, row["cancellation_rate_pct"])
-    print("  Q1 viz: q1:viz:{carrier}:avg_dep_delay  |  q1:viz:{carrier}:cancellation_rate")
+    if os.path.exists(Q1_CSV):
+        with open(Q1_CSV, newline="") as f:
+            for row in csv.DictReader(f):
+                carrier = row["OP_UNIQUE_CARRIER"]
+                month   = MONTH_LABELS.get(row["MONTH"], row["MONTH"])
+                r.hset(f"q1:viz:{carrier}:avg_dep_delay",     month, row["avg_dep_delay"])
+                r.hset(f"q1:viz:{carrier}:cancellation_rate", month, row["cancellation_rate_pct"])
+        print("  Q1 viz: q1:viz:{carrier}:avg_dep_delay  |  q1:viz:{carrier}:cancellation_rate")
 
     # ── Q2 ────────────────────────────────────────────────────────────────────
     components = [
         "avg_carrier_delay", "avg_weather_delay", "avg_nas_delay",
         "avg_security_delay", "avg_late_aircraft_delay",
     ]
-    with open(Q2_CSV, newline="") as f:
-        for row in csv.DictReader(f):
-            carrier = row["OP_UNIQUE_CARRIER"]
-            r.hset("q2:viz:avg_arr_delay", carrier, row["avg_arr_delay"])
-            for comp in components:
-                r.hset(f"q2:viz:{comp}", carrier, row[comp])
-    print("  Q2 viz: q2:viz:avg_arr_delay  |  q2:viz:avg_*_delay")
+    if os.path.exists(Q2_CSV):
+        with open(Q2_CSV, newline="") as f:
+            for row in csv.DictReader(f):
+                carrier = row["OP_UNIQUE_CARRIER"]
+                r.hset("q2:viz:avg_arr_delay", carrier, row["avg_arr_delay"])
+                for comp in components:
+                    r.hset(f"q2:viz:{comp}", carrier, row[comp])
+        print("  Q2 viz: q2:viz:avg_arr_delay  |  q2:viz:avg_*_delay")
 
     # ── Q3 ────────────────────────────────────────────────────────────────────
-    with open(Q3_PCT_CSV, newline="") as f:
-        for row in csv.DictReader(f):
-            carrier = row["OP_UNIQUE_CARRIER"]
-            hour    = f"{int(row['hour']):02d}"           # "00".."23" → ordine lessicografico corretto
-            for pct in ["p25", "p50", "p75", "p90"]:
-                r.hset(f"q3:viz:{carrier}:{pct}", hour, row[pct])
-    print("  Q3 viz: q3:viz:{carrier}:{p25|p50|p75|p90}  (field = ora 00–23)")
+    if os.path.exists(Q3_PCT_CSV):
+        with open(Q3_PCT_CSV, newline="") as f:
+            for row in csv.DictReader(f):
+                carrier = row["OP_UNIQUE_CARRIER"]
+                hour    = f"{int(row['hour']):02d}"       # "00".."23" → ordine lessicografico corretto
+                for pct in ["p25", "p50", "p75", "p90"]:
+                    r.hset(f"q3:viz:{carrier}:{pct}", hour, row[pct])
+        print("  Q3 viz: q3:viz:{carrier}:{p25|p50|p75|p90}  (field = ora 00–23)")
 
 
 # ── Clustering ────────────────────────────────────────────────────────────────
 #
-# CSV prodotto da clustering.py:
-#   OP_UNIQUE_CARRIER, total_flights, avg_dep_delay, avg_arr_delay,
-#   cancellation_rate, avg_carrier_delay, avg_weather_delay, avg_nas_delay,
-#   avg_security_delay, avg_late_aircraft, prediction
+# CSV prodotto da clustering_base.py / clustering_extended.py:
+#   OP_UNIQUE_CARRIER, total_flights, <feature_cols…>, prediction
+# (base = 8 feature, extended = base + 4; le metriche viz qui sotto sono
+#  presenti in entrambe le varianti)
 #
 # Chiavi Redis:
 #   clustering:carrier:{carrier}    HASH  tutte le colonne (dettaglio tabella)
@@ -204,7 +241,8 @@ def export_grafana_viz(r: redis.Redis) -> None:
 #   clustering:viz:cancellation_rate HASH {carrier → valore}              (barchart)
 #   clustering:meta                 HASH  {k, n_carriers}
 
-CLUSTERING_CSV = os.path.join(RESULTS_DIR, "clustering.csv")
+CLUSTERING_VARIANT = os.getenv("CLUSTERING_VARIANT", "base")   # "base" | "extended"
+CLUSTERING_CSV = os.path.join(RESULTS_DIR, f"clustering_{CLUSTERING_VARIANT}.csv")
 
 CLUSTERING_VIZ_METRICS = [
     "avg_dep_delay", "avg_arr_delay", "cancellation_rate",
@@ -214,7 +252,8 @@ CLUSTERING_VIZ_METRICS = [
 
 def export_clustering(r: redis.Redis) -> int:
     if not os.path.exists(CLUSTERING_CSV):
-        print("  [SKIP] clustering.csv non trovato — esegui prima clustering.py")
+        print(f"  [SKIP] {os.path.basename(CLUSTERING_CSV)} non trovato "
+              f"— esegui prima clustering_{CLUSTERING_VARIANT}.py")
         return 0
 
     rows = []
@@ -253,6 +292,7 @@ def export_clustering(r: redis.Redis) -> int:
 
 def main():
     r = connect()
+    print(f"Implementazione: {IMPL}  |  clustering: {CLUSTERING_VARIANT}")
 
     n = export_q1(r)
     print(f"Q1: {n} keys written  (pattern: q1:{{carrier}}:{{year}}:{{month}})")
