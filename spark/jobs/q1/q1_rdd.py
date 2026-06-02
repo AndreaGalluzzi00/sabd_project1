@@ -22,14 +22,12 @@ import time
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from pyspark.sql import SparkSession
-
-
 from utils_output import (
     show_rdd_result,
     save_rdd_csv_local,
     save_rdd_csv_hdfs
 )
+from utils import build_spark_session
 
 SPARK_MASTER = os.getenv("SPARK_MASTER", "spark://spark-master:7077")
 HDFS_INPUT   = "hdfs://namenode:9000/sabd/processed/"
@@ -46,18 +44,13 @@ HEADER = [
 os.makedirs(os.path.dirname(LOCAL_OUT), exist_ok=True)
 
 # La SparkSession contiene lo SparkContext, punto d'ingresso per gli RDD.
-spark = (
-    SparkSession.builder
-    .appName("Q1_RDD_AA_DL_monthly_stats")
-    .master(SPARK_MASTER)
-    .config("spark.hadoop.fs.defaultFS", "hdfs://namenode:9000")
-    .config("spark.ui.enabled", "true")
-    .config("spark.ui.port", "4040")
-    .getOrCreate()
+spark = build_spark_session(
+    app_name="Q1_RDD_AA_DL_monthly_stats",
+    master=SPARK_MASTER,
+    ui_enabled=True,
+    ui_port="4040",
 )
 sc = spark.sparkContext
-sc.setLogLevel("WARN")
-print(f"Master: {SPARK_MASTER}")
 
 
 # ─────────────────────────────────────────────────────────────────────────────

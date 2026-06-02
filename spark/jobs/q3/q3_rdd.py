@@ -26,7 +26,6 @@ import os
 import sys
 import time
 
-from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, floor
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -37,6 +36,7 @@ from utils_output import (
     save_rdd_csv_local,
     save_rdd_csv_hdfs,
 )
+from utils import build_spark_session
 
 SPARK_MASTER            = os.getenv("SPARK_MASTER", "spark://spark-master:7077")
 HDFS_INPUT              = "hdfs://namenode:9000/sabd/processed/"
@@ -51,18 +51,13 @@ COLS_RANGE = ["OP_UNIQUE_CARRIER", "min_delay", "max_delay"]
 
 os.makedirs(LOCAL_OUT, exist_ok=True)
 
-spark = (
-    SparkSession.builder
-    .appName("Q3_RDD_Percentiles")
-    .master(SPARK_MASTER)
-    .config("spark.hadoop.fs.defaultFS", "hdfs://namenode:9000")
-    .config("spark.ui.enabled", "true")
-    .config("spark.ui.port", "4040")
-    .getOrCreate()
+spark = build_spark_session(
+    app_name="Q3_RDD_Percentiles",
+    master=SPARK_MASTER,
+    ui_enabled=True,
+    ui_port="4040",
 )
 sc = spark.sparkContext
-sc.setLogLevel("WARN")
-print(f"Master: {SPARK_MASTER}")
 
 df = (
     spark.read.parquet(HDFS_INPUT)

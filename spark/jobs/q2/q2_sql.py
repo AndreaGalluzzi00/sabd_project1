@@ -16,13 +16,12 @@ import sys
 import time
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-from pyspark.sql import SparkSession
-
 from utils_output import (
     show_dataframe_result,
     save_csv_local,
     save_dataframe_hdfs,
 )
+from utils import build_spark_session
 
 SPARK_MASTER = os.getenv("SPARK_MASTER","spark://spark-master:7077")
 HDFS_INPUT   = "hdfs://namenode:9000/sabd/processed/"
@@ -31,16 +30,10 @@ LOCAL_OUT    = "/opt/spark/jobs/results/q2_sql.csv"
 
 os.makedirs(os.path.dirname(LOCAL_OUT), exist_ok=True)
 
-spark = (
-    SparkSession.builder
-    .appName("Q2_SQL_top10_carriers_arr_delay")
-    .master(SPARK_MASTER)
-    .config("spark.hadoop.fs.defaultFS", "hdfs://namenode:9000")
-    .config("spark.ui.enabled", "false")
-    .getOrCreate()
+spark = build_spark_session(
+    app_name="Q2_SQL_top10_carriers_arr_delay",
+    master=SPARK_MASTER,
 )
-spark.sparkContext.setLogLevel("WARN")
-print(f"Master: {SPARK_MASTER}")
 
 # Lettura e registrazione come vista temporanea
 df = spark.read.parquet(HDFS_INPUT)

@@ -19,7 +19,6 @@ import time
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from pyspark.sql import SparkSession
 from pyspark.sql.functions import (
     col, avg, min as spark_min, max as spark_max,
     count, sum as spark_sum, when, round as spark_round,
@@ -30,6 +29,7 @@ from utils_output import (
     save_csv_local,
     save_dataframe_hdfs,
 )
+from utils import build_spark_session
 
 SPARK_MASTER = os.getenv("SPARK_MASTER","spark://spark-master:7077")
 HDFS_INPUT   = "hdfs://namenode:9000/sabd/processed/"
@@ -38,16 +38,10 @@ LOCAL_OUT    = "/opt/spark/jobs/results/q1_df.csv"
 
 os.makedirs(os.path.dirname(LOCAL_OUT), exist_ok=True)
 
-spark = (
-    SparkSession.builder
-    .appName("Q1_AA_DL_monthly_stats")
-    .master(SPARK_MASTER)
-    .config("spark.hadoop.fs.defaultFS", "hdfs://namenode:9000")
-    .config("spark.ui.enabled", "false")
-    .getOrCreate()
+spark = build_spark_session(
+    app_name="Q1_AA_DL_monthly_stats",
+    master=SPARK_MASTER,
 )
-spark.sparkContext.setLogLevel("WARN")
-print(f"Master: {SPARK_MASTER}")
 
 # Lettura
 df = (
