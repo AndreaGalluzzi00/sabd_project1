@@ -97,8 +97,11 @@
             "uid": "redis"
           },
           "refId": "A",
-          "command": "hgetall",
-          "keyName": "q2:viz:avg_arr_delay"
+          "command": "zrange",
+          "keyName": "q2:ranking",
+          "min": "0",
+          "max": "-1",
+          "zrangeQuery": ""
         }
       ]
     },
