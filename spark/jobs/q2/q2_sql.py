@@ -1,16 +1,3 @@
-"""
-Q2 SQL — Top-10 compagnie per ARR_DELAY medio (gen-apr 2025)
-
-Filtro base: voli non cancellati e non deviati (CANCELLED=0, DIVERTED=0)
-Soglia:      solo compagnie con >= 500 voli nel filtro base
-Metriche:    num_flights, avg_arr_delay, media delle 5 cause di ritardo
-NULL cause:  trattati come 0 (BTS li omette quando delay totale < 15min)
-Ordine:      top-10 per avg_arr_delay decrescente
-
-Modalità:
-  - Dev locale:  SPARK_MASTER=local[2]  (default)
-  - Cluster:     SPARK_MASTER=spark://spark-master:7077
-"""
 import os
 import sys
 import time
@@ -42,6 +29,8 @@ df.createOrReplaceTempView("flights")
 # Calcolo Q2 con Spark SQL
 t0 = time.time()
 
+# per arr_delay possiamo ignorare il valore null poichè presente solo se sono diverted o cancelled
+# per le componenti di ritardo conteggiamo nella media anche i null (settati a 0)
 result = spark.sql("""
     SELECT
         OP_UNIQUE_CARRIER,
@@ -65,7 +54,7 @@ result.cache()
 rows = result.collect()
 elapsed = time.time() - t0
 
-# ── Output a schermo
+# Output a schermo
 show_dataframe_result(result, "Q2_SQL", elapsed, 20)
 
 # Salvataggio CSV locale

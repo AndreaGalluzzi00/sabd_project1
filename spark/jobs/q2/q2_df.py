@@ -1,16 +1,3 @@
-"""
-Q2 — Top-10 compagnie per ARR_DELAY medio (gen-apr 2025)
-
-Filtro base: voli non cancellati e non deviati (CANCELLED=0, DIVERTED=0)
-Soglia:      solo compagnie con ≥500 voli nel filtro base
-Metriche:    num_flights, avg_arr_delay, media delle 5 cause di ritardo
-NULL cause:  trattati come 0 (BTS li omette quando delay totale < 15min)
-Ordine:      top-10 per avg_arr_delay decrescente
-
-Modalità:
-  - Dev locale (Mac M1):  SPARK_MASTER=local[2]  (default)
-  - Cluster / EC2:        SPARK_MASTER=spark://spark-master:7077
-"""
 import sys
 import os
 import time
@@ -29,6 +16,7 @@ from utils_output import (
     save_dataframe_hdfs,
 )
 from utils import build_spark_session
+
 
 SPARK_MASTER = os.getenv("SPARK_MASTER","spark://spark-master:7077")
 HDFS_INPUT = "hdfs://namenode:9000/sabd/processed/"
@@ -52,6 +40,8 @@ df = (
 # Calcolo Q2
 t0 = time.time()
 
+#  Calcoliamo il numero di voli, il ritardo medio all'arrivo e i ritardi medi per ciascuna categoria di ritardo per ogni compagnia aerea
+#  Coalesce converte in valore oppure null in caso null viene sostituito con literal 0.0, in modo da non influenzare la media con valori nulli
 result = (
     df.groupBy("OP_UNIQUE_CARRIER")
     .agg(
@@ -78,11 +68,12 @@ result = (
     .limit(10)
 )
 
+#cachato per evitare di ripetere il calcolo più volte durante la fase di output e salvataggio
 result.cache()
 rows = result.collect()
 elapsed = time.time() - t0
 
-# ── Output a schermo
+# Output a schermo
 show_dataframe_result(result, "Q2", elapsed, 20)
 
 # Salvataggio CSV locale
