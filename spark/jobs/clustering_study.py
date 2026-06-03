@@ -1,36 +1,9 @@
-"""
-Clustering Study — BASE vs EXTENDED
-
-Esegue in un unico script i due studi di clustering:
-
-1. BASE:
-   usa solo le 8 feature richieste dalla traccia.
-
-2. EXTENDED:
-   usa le 8 feature richieste dalla traccia
-   + 4 feature aggiunte (poi sottoposte a feature selection per correlazione).
-
-L'obiettivo è confrontare i due studi mantenendo identici:
-- dataset
-- top-N carrier
-- pipeline
-- scaling
-- range di k
-- algoritmo KMeans
-
-L'unica cosa che cambia è il set di feature.
-"""
-
 import csv
 import os
 import sys
 import time
 
-# jobs/utils prima di jobs/ in sys.path
-sys.path.insert(
-    0,
-    os.path.join(os.path.dirname(os.path.abspath(__file__)), "utils")
-)
+sys.path.insert(0,os.path.join(os.path.dirname(os.path.abspath(__file__)), "utils"))
 
 from utils import build_spark_session
 import utils_clustering as uc
@@ -69,7 +42,6 @@ EXTRA_COLS = [
     "diverted_rate",
 ]
 
-
 # ── Studi da eseguire ─────────────────────────────────────────────────────────
 
 STUDIES = [
@@ -106,19 +78,15 @@ STUDIES = [
 ]
 
 
+
+
 def run_study(df, study):
 
     name = study["name"]
     label = study["label"]
     feature_cols = study["feature_cols"]
 
-    print("\n" + "=" * 90)
-    print(f"CLUSTERING {label}")
-    print("=" * 90)
-    print(f"Numero feature: {len(feature_cols)}")
-    print("Feature usate:")
-    for c in feature_cols:
-        print(f"  - {c}")
+    uc.print_study_header(label, feature_cols)
 
     t0 = time.time()
 
@@ -127,82 +95,34 @@ def run_study(df, study):
 
     # 1b. Feature selection tramite correlazione
     if study["run_correlation"]:
-        features_to_remove = uc.correlation_clustermap(
-            features_df,
-            feature_cols,
-            BASE_COLS,
-            EXTRA_COLS,
-            study["out_png_corr"],
-            study["out_corr_csv"],
-        )
-
-        # 1c. Rimozione effettiva delle feature ridondanti
-        feature_cols = uc.remove_features(
-            feature_cols,
-            features_to_remove,
-        )
+        features_to_remove = uc.correlation_clustermap(features_df,feature_cols,BASE_COLS,EXTRA_COLS,study["out_png_corr"],study["out_corr_csv"])
+        feature_cols = uc.remove_features(feature_cols,features_to_remove)
 
     # 2. Scaling
     df_scaled = uc.build_scaled_features(features_df, feature_cols)
 
     # 3. Ricerca miglior k
-    best_k, k_values, wssse_list, sil_list = uc.find_best_k(
-        df_scaled,
-        K_RANGE,
-        study["out_png_elbow"],
-    )
+    best_k, k_values, wssse_list, sil_list = uc.find_best_k(df_scaled,K_RANGE,study["out_png_elbow"])
 
     # 4. KMeans finale
-    df_result = uc.run_final_kmeans(
-        df_scaled,
-        best_k,
-    )
+    df_result = uc.run_final_kmeans(df_scaled,best_k)
 
     elapsed = time.time() - t0
 
     # 5. PCA
-    uc.pca_scatter_plot(
-        df_scaled,
-        df_result,
-        best_k,
-        study["out_png_pca"],
-        label=f"{name} ({len(feature_cols)} feature)",
-    )
+    uc.pca_scatter_plot(df_scaled,df_result,best_k,study["out_png_pca"],label=f"{name} ({len(feature_cols)} feature)")
 
     # 6. Profiling cluster
-    uc.profile_clusters(
-        features_df,
-        df_result,
-        feature_cols,
-        best_k,
-        study["out_png_profile"],
-        study["out_profile_csv"],
-    )
+    uc.profile_clusters(features_df,df_result,feature_cols,best_k,study["out_png_profile"],study["out_profile_csv"])
 
     # 8. Stampa risultati
-    uc.print_results(
-        df_result,
-        feature_cols,
-        best_k,
-        elapsed,
-        label=label,
-    )
+    uc.print_results(df_result,feature_cols,best_k,elapsed,label=label)
 
     # 9. Export metriche k
-    uc.export_k_metrics(
-        k_values,
-        wssse_list,
-        sil_list,
-        study["out_metrics_csv"],
-    )
+    uc.export_k_metrics(k_values,wssse_list,sil_list,study["out_metrics_csv"])
 
     # 10. Export risultati finali
-    uc.export_results(
-        df_result,
-        feature_cols,
-        study["out_csv"],
-        study["hdfs_output"],
-    )
+    uc.export_results(df_result,feature_cols,study["out_csv"],study["hdfs_output"])
 
     best_index = k_values.index(best_k)
 
