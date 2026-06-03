@@ -1,13 +1,13 @@
 {
   "id": null,
   "uid": "sabd-q2",
-  "title": "Q2 \u2014 Top 10 Carriers by Arrival Delay",
+  "title": "Q2 — Top 10 Carriers by Arrival Delay",
   "tags": [
     "sabd",
     "q2"
   ],
   "schemaVersion": 38,
-  "version": 2,
+  "version": 3,
   "refresh": false,
   "time": {
     "from": "now-1h",
@@ -19,7 +19,7 @@
   "panels": [
     {
       "id": 1,
-      "title": "Avg Arrival Delay \u2014 Top 10 Carriers (min)",
+      "title": "Avg Arrival Delay — Top 10 Carriers (min)",
       "description": "Classifica per ritardo medio in arrivo.",
       "type": "barchart",
       "gridPos": {
@@ -81,6 +81,12 @@
           }
         },
         {
+          "id": "limit",
+          "options": {
+            "limitField": 10
+          }
+        },
+        {
           "id": "organize",
           "options": {
             "renameByName": {
@@ -101,18 +107,18 @@
           "keyName": "q2:ranking",
           "min": "0",
           "max": "-1",
-          "zrangeQuery": ""
+          "zrangeQuery": "REV"
         }
       ]
     },
     {
       "id": 2,
-      "title": "Avg Delay Components per Carrier (min)",
-      "description": "Contributo medio delle diverse cause di ritardo (stacked).",
+      "title": "Avg Carrier Delay by Airline (min)",
+      "description": "Componente \"carrier\": confronto tra compagnie.",
       "type": "barchart",
       "gridPos": {
-        "h": 14,
-        "w": 24,
+        "h": 10,
+        "w": 12,
         "x": 0,
         "y": 12
       },
@@ -138,17 +144,13 @@
         "groupWidth": 0.7,
         "barWidth": 0.97,
         "tooltip": {
-          "mode": "multi",
+          "mode": "single",
           "sort": "none"
         },
         "legend": {
           "displayMode": "list",
           "placement": "bottom",
-          "showLegend": true
-        },
-        "stacking": {
-          "mode": "normal",
-          "group": "A"
+          "showLegend": false
         }
       },
       "transformations": [
@@ -162,21 +164,21 @@
           }
         },
         {
-          "id": "joinByField",
+          "id": "sortBy",
           "options": {
-            "byField": "Field",
-            "mode": "outer"
+            "fields": [
+              {
+                "desc": true,
+                "displayName": "Last"
+              }
+            ]
           }
         },
         {
           "id": "organize",
           "options": {
             "renameByName": {
-              "Last": "Carrier",
-              "Last 1": "Weather",
-              "Last 2": "NAS",
-              "Last 3": "Security",
-              "Last 4": "Late Aircraft",
+              "Last": "Carrier Delay",
               "Field": "Carrier"
             }
           }
@@ -191,40 +193,344 @@
           "refId": "A",
           "command": "hgetall",
           "keyName": "q2:viz:avg_carrier_delay"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Avg Weather Delay by Airline (min)",
+      "description": "Componente \"weather\": confronto tra compagnie.",
+      "type": "barchart",
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 12,
+        "y": 12
+      },
+      "datasource": {
+        "type": "redis-datasource",
+        "uid": "redis"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 2,
+          "color": {
+            "mode": "palette-classic"
+          }
         },
+        "overrides": []
+      },
+      "options": {
+        "xField": "Field",
+        "orientation": "auto",
+        "fillOpacity": 80,
+        "gradientMode": "none",
+        "groupWidth": 0.7,
+        "barWidth": 0.97,
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        }
+      },
+      "transformations": [
+        {
+          "id": "reduce",
+          "options": {
+            "reducers": [
+              "last"
+            ],
+            "labelsToFields": false
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": [
+              {
+                "desc": true,
+                "displayName": "Last"
+              }
+            ]
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "renameByName": {
+              "Last": "Weather Delay",
+              "Field": "Carrier"
+            }
+          }
+        }
+      ],
+      "targets": [
         {
           "datasource": {
             "type": "redis-datasource",
             "uid": "redis"
           },
-          "refId": "B",
+          "refId": "A",
           "command": "hgetall",
           "keyName": "q2:viz:avg_weather_delay"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Avg NAS Delay by Airline (min)",
+      "description": "Componente \"NAS\" (National Airspace System): confronto tra compagnie.",
+      "type": "barchart",
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 0,
+        "y": 22
+      },
+      "datasource": {
+        "type": "redis-datasource",
+        "uid": "redis"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 2,
+          "color": {
+            "mode": "palette-classic"
+          }
         },
+        "overrides": []
+      },
+      "options": {
+        "xField": "Field",
+        "orientation": "auto",
+        "fillOpacity": 80,
+        "gradientMode": "none",
+        "groupWidth": 0.7,
+        "barWidth": 0.97,
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        }
+      },
+      "transformations": [
+        {
+          "id": "reduce",
+          "options": {
+            "reducers": [
+              "last"
+            ],
+            "labelsToFields": false
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": [
+              {
+                "desc": true,
+                "displayName": "Last"
+              }
+            ]
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "renameByName": {
+              "Last": "NAS Delay",
+              "Field": "Carrier"
+            }
+          }
+        }
+      ],
+      "targets": [
         {
           "datasource": {
             "type": "redis-datasource",
             "uid": "redis"
           },
-          "refId": "C",
+          "refId": "A",
           "command": "hgetall",
           "keyName": "q2:viz:avg_nas_delay"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Avg Security Delay by Airline (min)",
+      "description": "Componente \"security\": confronto tra compagnie.",
+      "type": "barchart",
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 12,
+        "y": 22
+      },
+      "datasource": {
+        "type": "redis-datasource",
+        "uid": "redis"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 2,
+          "color": {
+            "mode": "palette-classic"
+          }
         },
+        "overrides": []
+      },
+      "options": {
+        "xField": "Field",
+        "orientation": "auto",
+        "fillOpacity": 80,
+        "gradientMode": "none",
+        "groupWidth": 0.7,
+        "barWidth": 0.97,
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        }
+      },
+      "transformations": [
+        {
+          "id": "reduce",
+          "options": {
+            "reducers": [
+              "last"
+            ],
+            "labelsToFields": false
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": [
+              {
+                "desc": true,
+                "displayName": "Last"
+              }
+            ]
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "renameByName": {
+              "Last": "Security Delay",
+              "Field": "Carrier"
+            }
+          }
+        }
+      ],
+      "targets": [
         {
           "datasource": {
             "type": "redis-datasource",
             "uid": "redis"
           },
-          "refId": "D",
+          "refId": "A",
           "command": "hgetall",
           "keyName": "q2:viz:avg_security_delay"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Avg Late-Aircraft Delay by Airline (min)",
+      "description": "Componente \"late aircraft\": confronto tra compagnie.",
+      "type": "barchart",
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 0,
+        "y": 32
+      },
+      "datasource": {
+        "type": "redis-datasource",
+        "uid": "redis"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 2,
+          "color": {
+            "mode": "palette-classic"
+          }
         },
+        "overrides": []
+      },
+      "options": {
+        "xField": "Field",
+        "orientation": "auto",
+        "fillOpacity": 80,
+        "gradientMode": "none",
+        "groupWidth": 0.7,
+        "barWidth": 0.97,
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        }
+      },
+      "transformations": [
+        {
+          "id": "reduce",
+          "options": {
+            "reducers": [
+              "last"
+            ],
+            "labelsToFields": false
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": [
+              {
+                "desc": true,
+                "displayName": "Last"
+              }
+            ]
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "renameByName": {
+              "Last": "Late Aircraft Delay",
+              "Field": "Carrier"
+            }
+          }
+        }
+      ],
+      "targets": [
         {
           "datasource": {
             "type": "redis-datasource",
             "uid": "redis"
           },
-          "refId": "E",
+          "refId": "A",
           "command": "hgetall",
           "keyName": "q2:viz:avg_late_aircraft_delay"
         }

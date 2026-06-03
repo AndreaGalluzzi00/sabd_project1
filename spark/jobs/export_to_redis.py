@@ -222,7 +222,10 @@ def export_grafana_viz(r: redis.Redis, q1_rows: list[dict], q2_rows: list[dict],
 
     # ── Q1 ────────────────────────────────────────────────────────────────────
     if q1_rows:
-        for row in q1_rows:
+        # Inseriamo i field in ordine di mese: Redis conserva l'ordine d'inserimento
+        # per gli hash piccoli (listpack), così HGETALL li ritorna Jan→Apr e il
+        # barchart Grafana mostra i mesi in ordine cronologico senza sort esplicito.
+        for row in sorted(q1_rows, key=lambda x: int(x["MONTH"])):
             carrier = row["OP_UNIQUE_CARRIER"]
             month   = MONTH_LABELS.get(row["MONTH"], row["MONTH"])
             r.hset(f"q1:viz:{carrier}:avg_dep_delay",     month, row["avg_dep_delay"])

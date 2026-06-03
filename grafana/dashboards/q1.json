@@ -1,13 +1,13 @@
 {
   "id": null,
   "uid": "sabd-q1",
-  "title": "Q1 \u2014 Monthly Statistics: AA vs DL",
+  "title": "Q1 — Monthly Statistics: AA vs DL",
   "tags": [
     "sabd",
     "q1"
   ],
   "schemaVersion": 38,
-  "version": 2,
+  "version": 3,
   "refresh": false,
   "time": {
     "from": "now-1h",
@@ -19,11 +19,11 @@
   "panels": [
     {
       "id": 1,
-      "title": "Avg Departure Delay by Month (min)",
-      "description": "Media DEP_DELAY mensile (solo voli non cancellati).",
+      "title": "Avg Departure Delay — AA (min)",
+      "description": "Media DEP_DELAY mensile (solo voli non cancellati) — American Airlines.",
       "type": "barchart",
       "gridPos": {
-        "h": 12,
+        "h": 11,
         "w": 12,
         "x": 0,
         "y": 0
@@ -50,13 +50,13 @@
         "groupWidth": 0.7,
         "barWidth": 0.97,
         "tooltip": {
-          "mode": "multi",
+          "mode": "single",
           "sort": "none"
         },
         "legend": {
           "displayMode": "list",
           "placement": "bottom",
-          "showLegend": true
+          "showLegend": false
         }
       },
       "transformations": [
@@ -70,18 +70,10 @@
           }
         },
         {
-          "id": "joinByField",
-          "options": {
-            "byField": "Field",
-            "mode": "outer"
-          }
-        },
-        {
           "id": "organize",
           "options": {
             "renameByName": {
-              "Last": "AA",
-              "Last 1": "DL",
+              "Last": "Avg Dep Delay",
               "Field": "Month"
             }
           }
@@ -96,28 +88,93 @@
           "refId": "A",
           "command": "hgetall",
           "keyName": "q1:viz:AA:avg_dep_delay"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Avg Departure Delay — DL (min)",
+      "description": "Media DEP_DELAY mensile (solo voli non cancellati) — Delta Air Lines.",
+      "type": "barchart",
+      "gridPos": {
+        "h": 11,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "datasource": {
+        "type": "redis-datasource",
+        "uid": "redis"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 2,
+          "color": {
+            "mode": "palette-classic"
+          }
         },
+        "overrides": []
+      },
+      "options": {
+        "xField": "Field",
+        "orientation": "auto",
+        "fillOpacity": 80,
+        "gradientMode": "none",
+        "groupWidth": 0.7,
+        "barWidth": 0.97,
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        }
+      },
+      "transformations": [
+        {
+          "id": "reduce",
+          "options": {
+            "reducers": [
+              "last"
+            ],
+            "labelsToFields": false
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "renameByName": {
+              "Last": "Avg Dep Delay",
+              "Field": "Month"
+            }
+          }
+        }
+      ],
+      "targets": [
         {
           "datasource": {
             "type": "redis-datasource",
             "uid": "redis"
           },
-          "refId": "B",
+          "refId": "A",
           "command": "hgetall",
           "keyName": "q1:viz:DL:avg_dep_delay"
         }
       ]
     },
     {
-      "id": 2,
-      "title": "Cancellation Rate by Month (%)",
-      "description": "Percentuale voli cancellati sul totale per mese.",
+      "id": 3,
+      "title": "Cancellation Rate — AA (%)",
+      "description": "Percentuale voli cancellati sul totale per mese — American Airlines.",
       "type": "barchart",
       "gridPos": {
-        "h": 12,
+        "h": 11,
         "w": 12,
-        "x": 12,
-        "y": 0
+        "x": 0,
+        "y": 11
       },
       "datasource": {
         "type": "redis-datasource",
@@ -141,13 +198,13 @@
         "groupWidth": 0.7,
         "barWidth": 0.97,
         "tooltip": {
-          "mode": "multi",
+          "mode": "single",
           "sort": "none"
         },
         "legend": {
           "displayMode": "list",
           "placement": "bottom",
-          "showLegend": true
+          "showLegend": false
         }
       },
       "transformations": [
@@ -161,18 +218,10 @@
           }
         },
         {
-          "id": "joinByField",
-          "options": {
-            "byField": "Field",
-            "mode": "outer"
-          }
-        },
-        {
           "id": "organize",
           "options": {
             "renameByName": {
-              "Last": "AA",
-              "Last 1": "DL",
+              "Last": "Cancellation Rate",
               "Field": "Month"
             }
           }
@@ -187,13 +236,78 @@
           "refId": "A",
           "command": "hgetall",
           "keyName": "q1:viz:AA:cancellation_rate"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Cancellation Rate — DL (%)",
+      "description": "Percentuale voli cancellati sul totale per mese — Delta Air Lines.",
+      "type": "barchart",
+      "gridPos": {
+        "h": 11,
+        "w": 12,
+        "x": 12,
+        "y": 11
+      },
+      "datasource": {
+        "type": "redis-datasource",
+        "uid": "redis"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 2,
+          "color": {
+            "mode": "palette-classic"
+          }
         },
+        "overrides": []
+      },
+      "options": {
+        "xField": "Field",
+        "orientation": "auto",
+        "fillOpacity": 80,
+        "gradientMode": "none",
+        "groupWidth": 0.7,
+        "barWidth": 0.97,
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        }
+      },
+      "transformations": [
+        {
+          "id": "reduce",
+          "options": {
+            "reducers": [
+              "last"
+            ],
+            "labelsToFields": false
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "renameByName": {
+              "Last": "Cancellation Rate",
+              "Field": "Month"
+            }
+          }
+        }
+      ],
+      "targets": [
         {
           "datasource": {
             "type": "redis-datasource",
             "uid": "redis"
           },
-          "refId": "B",
+          "refId": "A",
           "command": "hgetall",
           "keyName": "q1:viz:DL:cancellation_rate"
         }
