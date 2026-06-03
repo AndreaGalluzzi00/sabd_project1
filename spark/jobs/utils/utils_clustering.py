@@ -64,7 +64,7 @@ def feature_expressions():
             avg(when(col("CANCELLED") == 0, coalesce(col("SECURITY_DELAY"), lit(0.0)))), 4),
         "avg_late_aircraft": spark_round(
             avg(when(col("CANCELLED") == 0, coalesce(col("LATE_AIRCRAFT_DELAY"), lit(0.0)))), 4),
-        # ── 4 feature aggiunte (solo versione extended) ─────────────────────
+        # ── 3 feature aggiunte (solo versione extended) ─────────────────────
         "std_dep_delay": spark_round(
             stddev(when(col("CANCELLED") == 0, col("DEP_DELAY"))), 4),
         "on_time_rate": spark_round(
@@ -129,7 +129,7 @@ def find_best_k(df_scaled, k_range, out_png_elbow):
 
     print(f"\nRicerca k ottimale (range {k_values}):")
     for k in k_values:
-        km    = KMeans(featuresCol="features", k=k, seed=42, maxIter=30)
+        km    = KMeans(featuresCol="features", k=k, seed=42, maxIter=100, initSteps=10)
         model = km.fit(df_scaled)
         preds = model.transform(df_scaled)
         wssse = model.summary.trainingCost
@@ -169,7 +169,7 @@ def find_best_k(df_scaled, k_range, out_png_elbow):
 
 # ── 5. KMeans finale con k ottimale ───────────────────────────────────────────
 def run_final_kmeans(df_scaled, best_k):
-    km_model = KMeans(featuresCol="features", k=best_k, seed=42, maxIter=30).fit(df_scaled)
+    km_model = KMeans(featuresCol="features", k=best_k, seed=42, maxIter=100, initSteps=10).fit(df_scaled)
     return km_model.transform(df_scaled)
 
 
