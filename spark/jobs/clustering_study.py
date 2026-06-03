@@ -67,7 +67,6 @@ EXTRA_COLS = [
     "std_dep_delay",
     "on_time_rate",
     "diverted_rate",
-    "controllable_delay_share",
 ]
 
 
@@ -339,7 +338,7 @@ def main():
     print("\nFine clustering study.")
     print("=" * 90)
 
-    spark._sc._jvm.System.exit(0)
+    spark.stop()
 
 
 if __name__ == "__main__":

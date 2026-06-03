@@ -83,15 +83,6 @@ def feature_expressions():
             spark_sum(when(col("CANCELLED") == 0, lit(1.0)).otherwise(lit(0.0))) * 100, 4),
         "diverted_rate": spark_round(
             spark_sum("DIVERTED") / count("*") * 100, 4),
-        # quota di ritardo "controllabile" (carrier + late aircraft) sul totale
-        # delle 5 cause: misura il PROFILO del ritardo, ortogonale alla magnitudine.
-        # Calcolata dai sum dei minuti (non dalle medie); guardia anti div/0.
-        "controllable_delay_share": spark_round(
-            when(spark_sum(when(_nc, _total_cause)) == 0, lit(0.0))
-            .otherwise(
-                spark_sum(when(_nc, _controllable)) /
-                spark_sum(when(_nc, _total_cause)) * 100
-            ), 4),
 
     }
 
