@@ -43,7 +43,7 @@ SPARK_MASTER = os.getenv("SPARK_MASTER", "spark://spark-master:7077")
 HDFS_INPUT = "hdfs://namenode:9000/sabd/processed/"
 HDFS_OUTPUT_ROOT = "hdfs://namenode:9000/sabd/results"
 
-RESULTS_DIR = "/opt/spark/jobs/results"
+RESULTS_DIR = "/opt/results"
 TOP_N_CARRIERS = 15
 K_RANGE = range(2, 7)
 

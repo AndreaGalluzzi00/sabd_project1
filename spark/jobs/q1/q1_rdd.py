@@ -14,7 +14,7 @@ from utils import build_spark_session
 SPARK_MASTER = os.getenv("SPARK_MASTER", "spark://spark-master:7077")
 HDFS_INPUT   = "hdfs://namenode:9000/sabd/processed/"
 HDFS_OUTPUT  = "hdfs://namenode:9000/sabd/results/q1_rdd/"
-LOCAL_OUT    = "/opt/spark/jobs/results/q1_rdd.csv"
+LOCAL_OUT    = "/opt/results/q1_rdd.csv"
 
 # HEADER corrisponde all'intestazione del CSV.
 # Stesso ordine delle versioni DataFrame/SQL (per confronto).

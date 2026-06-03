@@ -35,9 +35,9 @@ SPARK_MASTER            = os.getenv("SPARK_MASTER", "spark://spark-master:7077")
 HDFS_INPUT              = "hdfs://namenode:9000/sabd/processed/"
 HDFS_OUTPUT_PERCENTILES = "hdfs://namenode:9000/sabd/results/q3_tdigest/percentiles/"
 HDFS_OUTPUT_RANGE       = "hdfs://namenode:9000/sabd/results/q3_tdigest/delay_range/"
-LOCAL_OUT_PERCENTILES   = "/opt/spark/jobs/results/q3_percentiles_tdigest.csv"
-LOCAL_OUT_RANGE         = "/opt/spark/jobs/results/q3_delay_range_tdigest.csv"
-LOCAL_OUT               = "/opt/spark/jobs/results"
+LOCAL_OUT_PERCENTILES   = "/opt/results/q3_percentiles_tdigest.csv"
+LOCAL_OUT_RANGE         = "/opt/results/q3_delay_range_tdigest.csv"
+LOCAL_OUT               = "/opt/results"
 
 os.makedirs(LOCAL_OUT, exist_ok=True)
 COLS_PERC  = ["OP_UNIQUE_CARRIER", "hour", "p25", "p50", "p75", "p90"]
