@@ -72,14 +72,13 @@ def feature_expressions():
             spark_sum(when(col("CANCELLED") == 0, lit(1.0)).otherwise(lit(0.0))) * 100, 4),
         "diverted_rate": spark_round(
             spark_sum("DIVERTED") / count("*") * 100, 4),
-        "avg_delay_recovery": spark_round(
-            avg(when((col("CANCELLED") == 0) & (col("DIVERTED") == 0), col("DEP_DELAY") - col("ARR_DELAY"))), 4),
+
     }
 
 
 # ── 1. Caricamento e selezione carrier ────────────────────────────────────────
-def load_and_select_carriers(spark, hdfs_input, top_n):
-    df_raw = spark.read.parquet(hdfs_input)
+def load_and_select_carriers(df_raw, top_n):
+
 
     top_carriers = (
         df_raw.groupBy("OP_UNIQUE_CARRIER")
@@ -345,20 +344,52 @@ def correlation_clustermap(features_df, feature_cols, base_cols, extra_cols,
 
     # --- verdetto per ciascuna feature aggiunta ---
     idx = {c: i for i, c in enumerate(feature_cols)}
+    features_to_remove = []
+
     print(f"\nGiustificazione feature aggiunte (soglia ridondanza |r| >= {redundancy_threshold}):")
     with open(out_csv, "w", newline="") as f:
         w = csv.writer(f)
         w.writerow(["extra_feature", "best_base_correlate", "max_abs_corr", "verdict"]
                    + [f"corr_{b}" for b in base_cols])
+
         for e in extra_cols:
-            corrs   = {b: float(corr[idx[e], idx[b]]) for b in base_cols}
-            best_b  = max(base_cols, key=lambda b: abs(corrs[b]))
+            corrs = {b: float(corr[idx[e], idx[b]]) for b in base_cols}
+            best_b = max(base_cols, key=lambda b: abs(corrs[b]))
             max_abs = abs(corrs[best_b])
             verdict = "REDUNDANT" if max_abs >= redundancy_threshold else "KEEP"
+
+            if verdict == "REDUNDANT":
+                features_to_remove.append(e)
+
             print(f"  {e:18s} -> {best_b:18s} |r|={max_abs:.2f}  => {verdict}")
-            w.writerow([e, best_b, round(max_abs, 4), verdict] + [round(corrs[b], 4) for b in base_cols])
+            w.writerow([e, best_b, round(max_abs, 4), verdict]
+                       + [round(corrs[b], 4) for b in base_cols])
+
     print(f"Correlation summary: {out_csv}")
 
+    return features_to_remove
+
+
+def remove_features(feature_cols, features_to_remove):
+    """
+    Rimuove da feature_cols le feature presenti in features_to_remove.
+    """
+
+    if not features_to_remove:
+        print("\nNessuna feature ridondante da rimuovere.")
+        return feature_cols
+
+    filtered_cols = [c for c in feature_cols if c not in features_to_remove]
+
+    print("\nFeature rimosse per alta correlazione:")
+    for c in features_to_remove:
+        print(f"  - {c}")
+
+    print("\nFeature finali usate da KMeans:")
+    for c in filtered_cols:
+        print(f"  - {c}")
+
+    return filtered_cols
 
 # ── 8. Metriche per il confronto base vs extended ─────────────────────────────
 def export_k_metrics(k_values, wssse_list, silhouette_list, local_csv):
