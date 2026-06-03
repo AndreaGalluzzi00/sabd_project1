@@ -8,7 +8,7 @@ Esegue in un unico script i due studi di clustering:
 
 2. EXTENDED:
    usa le 8 feature richieste dalla traccia
-   + 3 feature aggiunte (poi sottoposte a feature selection per correlazione).
+   + 4 feature aggiunte (poi sottoposte a feature selection per correlazione).
 
 L'obiettivo è confrontare i due studi mantenendo identici:
 - dataset
@@ -67,6 +67,7 @@ EXTRA_COLS = [
     "std_dep_delay",
     "on_time_rate",
     "diverted_rate",
+    "controllable_delay_share",
 ]
 
 

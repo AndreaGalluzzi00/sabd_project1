@@ -46,6 +46,17 @@ def feature_expressions():
     quella extended condividano esattamente la stessa definizione di ciascuna
     feature e il confronto sia legittimo.
     """
+    # cause di ritardo (NULL -> 0) sui soli voli non cancellati, riusate per la
+    # composizione "controllable" (carrier + late aircraft) vs totale delle 5 cause.
+    _nc           = col("CANCELLED") == 0
+    _carrier      = coalesce(col("CARRIER_DELAY"),       lit(0.0))
+    _weather      = coalesce(col("WEATHER_DELAY"),       lit(0.0))
+    _nas          = coalesce(col("NAS_DELAY"),           lit(0.0))
+    _security     = coalesce(col("SECURITY_DELAY"),      lit(0.0))
+    _late         = coalesce(col("LATE_AIRCRAFT_DELAY"), lit(0.0))
+    _controllable = _carrier + _late
+    _total_cause  = _carrier + _weather + _nas + _security + _late
+
     return {
         # ── 8 feature richieste dalla traccia ───────────────────────────────
         "avg_dep_delay": spark_round(
@@ -64,7 +75,7 @@ def feature_expressions():
             avg(when(col("CANCELLED") == 0, coalesce(col("SECURITY_DELAY"), lit(0.0)))), 4),
         "avg_late_aircraft": spark_round(
             avg(when(col("CANCELLED") == 0, coalesce(col("LATE_AIRCRAFT_DELAY"), lit(0.0)))), 4),
-        # ── 3 feature aggiunte (solo versione extended) ─────────────────────
+        # ── 4 feature aggiunte (solo versione extended) ─────────────────────
         "std_dep_delay": spark_round(
             stddev(when(col("CANCELLED") == 0, col("DEP_DELAY"))), 4),
         "on_time_rate": spark_round(
@@ -72,6 +83,15 @@ def feature_expressions():
             spark_sum(when(col("CANCELLED") == 0, lit(1.0)).otherwise(lit(0.0))) * 100, 4),
         "diverted_rate": spark_round(
             spark_sum("DIVERTED") / count("*") * 100, 4),
+        # quota di ritardo "controllabile" (carrier + late aircraft) sul totale
+        # delle 5 cause: misura il PROFILO del ritardo, ortogonale alla magnitudine.
+        # Calcolata dai sum dei minuti (non dalle medie); guardia anti div/0.
+        "controllable_delay_share": spark_round(
+            when(spark_sum(when(_nc, _total_cause)) == 0, lit(0.0))
+            .otherwise(
+                spark_sum(when(_nc, _controllable)) /
+                spark_sum(when(_nc, _total_cause)) * 100
+            ), 4),
 
     }
 
