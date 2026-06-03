@@ -35,7 +35,7 @@ import utils_clustering as uc
 SPARK_MASTER  = os.getenv("SPARK_MASTER", "spark://spark-master:7077")
 HDFS_INPUT    = "hdfs://namenode:9000/sabd/processed/"
 HDFS_OUTPUT   = "hdfs://namenode:9000/sabd/results/clustering_extended/"
-RESULTS_DIR   = "/opt/spark/jobs/results"
+RESULTS_DIR   = "/opt/results"
 TOP_N_CARRIERS = 15
 K_RANGE        = range(2, 7)
 

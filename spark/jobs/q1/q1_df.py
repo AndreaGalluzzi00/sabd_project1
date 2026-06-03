@@ -1,18 +1,3 @@
-"""
-Q1 — AA e DL: statistiche mensili DEP_DELAY e cancellation rate (gen-apr 2025)
-
-Metriche:
-  - cancellation_rate: su TUTTI i voli del mese
-  - avg/min/max DEP_DELAY: solo su voli NON cancellati (CANCELLED = 0)
-
-Modalità:
-  - Dev locale (Mac M1):  SPARK_MASTER=local[2]  (default)
-  - Cluster / EC2:        SPARK_MASTER=spark://spark-master:7077
-"""
-"""
-Q1 — AA e DL: statistiche mensili DEP_DELAY e cancellation rate (gen-apr 2025)
-"""
-
 import os
 import sys
 import time
@@ -34,59 +19,73 @@ from utils import build_spark_session
 SPARK_MASTER = os.getenv("SPARK_MASTER","spark://spark-master:7077")
 HDFS_INPUT   = "hdfs://namenode:9000/sabd/processed/"
 HDFS_OUTPUT  = "hdfs://namenode:9000/sabd/results/q1_df/"
-LOCAL_OUT    = "/opt/spark/jobs/results/q1_df.csv"
+LOCAL_OUT    = "/opt/results/q1_df.csv"
 
 os.makedirs(os.path.dirname(LOCAL_OUT), exist_ok=True)
 
-spark = build_spark_session(
-    app_name="Q1_AA_DL_monthly_stats",
-    master=SPARK_MASTER,
-)
 
-# Lettura
-df = (
-    spark.read.parquet(HDFS_INPUT)
-    .filter(col("OP_UNIQUE_CARRIER").isin("AA", "DL"))
-)
+def main():
 
-# Calcolo Q1
-t0 = time.time()
-
-result = (
-    df.groupBy("OP_UNIQUE_CARRIER", "YEAR", "MONTH")
-    .agg(
-        count("*").alias("total_flights"),
-        spark_sum(col("CANCELLED").cast("long")).alias("cancelled_flights"),
-        spark_round(
-            spark_sum("CANCELLED") / count("*") * 100, 4
-        ).alias("cancellation_rate_pct"),
-        spark_round(
-            avg(when(col("CANCELLED") == 0, col("DEP_DELAY"))), 4
-        ).alias("avg_dep_delay"),
-        spark_round(
-            spark_min(when(col("CANCELLED") == 0, col("DEP_DELAY"))), 4
-        ).alias("min_dep_delay"),
-        spark_round(
-            spark_max(when(col("CANCELLED") == 0, col("DEP_DELAY"))), 4
-        ).alias("max_dep_delay"),
+    spark = build_spark_session(
+        app_name="Q1_AA_DL_monthly_stats",
+        master=SPARK_MASTER,
     )
-    .orderBy("OP_UNIQUE_CARRIER", "YEAR", "MONTH")
-)
 
-result.cache()
-rows = result.collect()
-elapsed = time.time() - t0
+    # Lettura
+    df = (
+        spark.read.parquet(HDFS_INPUT)
+        .filter(col("OP_UNIQUE_CARRIER").isin("AA", "DL"))
+    )
 
-# Output a schermo
-show_dataframe_result(result, "Q1", elapsed, 20)
+    ### Calcolo Q1
 
-# Salvataggio CSV locale (directory montata → visibile sull'host)
-save_csv_local(LOCAL_OUT, result, rows)
+    # Calcolo tempo iniziale
+    t0 = time.time()
 
-# Salvataggio su HDFS
-save_dataframe_hdfs(result, HDFS_OUTPUT)
+    result = (
+        df.groupBy("OP_UNIQUE_CARRIER", "YEAR", "MONTH")
+        .agg(
+            count("*").alias("total_flights"),
+            spark_sum(col("CANCELLED").cast("long")).alias("cancelled_flights"),
+            spark_round(
+                spark_sum("CANCELLED") / count("*") * 100, 4
+            ).alias("cancellation_rate_pct"),
+            spark_round(
+                avg(when(col("CANCELLED") == 0, col("DEP_DELAY"))), 4
+            ).alias("avg_dep_delay"),
+            spark_round(
+                spark_min(when(col("CANCELLED") == 0, col("DEP_DELAY"))), 4
+            ).alias("min_dep_delay"),
+            spark_round(
+                spark_max(when(col("CANCELLED") == 0, col("DEP_DELAY"))), 4
+            ).alias("max_dep_delay"),
+        )
+        .orderBy("OP_UNIQUE_CARRIER", "YEAR", "MONTH")
+    )
 
-print(f"\nTempo Q1 (DataFrame API): {elapsed:.2f}s")
-print(f"{'='*70}\n")
+    # Caching
+    result.cache()
 
-spark.stop()
+    # Esecuzione
+    rows = result.collect()
+
+    # Calcolo tempo trascorso
+    elapsed = time.time() - t0
+
+    # Output a schermo
+    show_dataframe_result(result, "Q1", elapsed, 20)
+
+    # Salvataggio CSV locale (directory montata → visibile sull'host)
+    save_csv_local(LOCAL_OUT, result, rows)
+
+    # Salvataggio su HDFS
+    save_dataframe_hdfs(result, HDFS_OUTPUT)
+
+    print(f"\nTempo Q1 (DataFrame API): {elapsed:.2f}s")
+    print(f"{'='*70}\n")
+
+    spark.stop()
+
+
+if __name__ == "__main__":
+    main()

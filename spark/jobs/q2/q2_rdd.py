@@ -17,7 +17,7 @@ from utils import build_spark_session
 SPARK_MASTER = os.getenv("SPARK_MASTER", "spark://spark-master:7077")
 HDFS_INPUT   = "hdfs://namenode:9000/sabd/processed/"
 HDFS_OUTPUT  = "hdfs://namenode:9000/sabd/results/q2_rdd/"
-LOCAL_OUT    = "/opt/spark/jobs/results/q2_rdd.csv"
+LOCAL_OUT    = "/opt/results/q2_rdd.csv"
 
 # Stesso ordine di colonne delle versioni DataFrame/SQL direttamente confrontabile.
 HEADER = [

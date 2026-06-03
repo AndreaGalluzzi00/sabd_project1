@@ -47,6 +47,7 @@ services:
       - "4040:4040"# RPC Spark Master
     volumes:
       - ./spark/jobs:/opt/spark/jobs
+      - ./results:/opt/results
       - ./nifi/config:/opt/hadoop/conf
     environment:
       - HADOOP_CONF_DIR=/opt/hadoop/conf
@@ -64,6 +65,7 @@ services:
     command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
     volumes:
       - ./spark/jobs:/opt/spark/jobs
+      - ./results:/opt/results
       - ./nifi/config:/opt/hadoop/conf
     environment:
       - HADOOP_CONF_DIR=/opt/hadoop/conf

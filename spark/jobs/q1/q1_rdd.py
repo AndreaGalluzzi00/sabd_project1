@@ -1,21 +1,3 @@
-"""
-Q1 (RDD) — AA e DL: statistiche mensili DEP_DELAY e cancellation rate (gen-apr 2025)
-
-Versione implementata con le API RDD (low-level) di Spark, da confrontare con
-le versioni DataFrame (q1_df.py) e Spark SQL (q1_sql.py).
-
-Metriche:
-  - cancellation_rate: su TUTTI i voli del mese
-  - avg/min/max DEP_DELAY: solo su voli NON cancellati (CANCELLED = 0)
-
-Pipeline RDD (tutta lazy, una sola action finale):
-  read parquet → .rdd → filter(AA/DL) → map(to_pair) → reduceByKey(combine)
-  → mapValues(finalize) → collect()  ← UNICA action
-
-Modalità:
-  - Dev locale (Mac M1):  SPARK_MASTER=local[2]  (default)
-  - Cluster / EC2:        SPARK_MASTER=spark://spark-master:7077
-"""
 import os
 import sys
 import time
@@ -32,60 +14,48 @@ from utils import build_spark_session
 SPARK_MASTER = os.getenv("SPARK_MASTER", "spark://spark-master:7077")
 HDFS_INPUT   = "hdfs://namenode:9000/sabd/processed/"
 HDFS_OUTPUT  = "hdfs://namenode:9000/sabd/results/q1_rdd/"
-LOCAL_OUT    = "/opt/spark/jobs/results/q1_rdd.csv"
+LOCAL_OUT    = "/opt/results/q1_rdd.csv"
 
-# Intestazione del CSV: stesso ordine delle versioni DataFrame/SQL → confrontabile.
+# HEADER corrisponde all'intestazione del CSV.
+# Stesso ordine delle versioni DataFrame/SQL (per confronto).
 HEADER = [
-    "OP_UNIQUE_CARRIER", "YEAR", "MONTH",
-    "total_flights", "cancelled_flights", "cancellation_rate_pct",
-    "avg_dep_delay", "min_dep_delay", "max_dep_delay",
+    "OP_UNIQUE_CARRIER",
+    "YEAR",
+    "MONTH",
+    "total_flights",
+    "cancelled_flights",
+    "cancellation_rate_pct",
+    "avg_dep_delay",
+    "min_dep_delay",
+    "max_dep_delay",
 ]
 
-os.makedirs(os.path.dirname(LOCAL_OUT), exist_ok=True)
+def to_key_value(r):
 
-# La SparkSession contiene lo SparkContext, punto d'ingresso per gli RDD.
-spark = build_spark_session(
-    app_name="Q1_RDD_AA_DL_monthly_stats",
-    master=SPARK_MASTER,
-    ui_enabled=True,
-    ui_port="4040",
-)
-sc = spark.sparkContext
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Funzioni della pipeline RDD
-# ─────────────────────────────────────────────────────────────────────────────
-
-def to_pair(r):
-    """Row → (chiave, aggregato_parziale di UNA riga).
-
-    CHIAVE  = (OP_UNIQUE_CARRIER, YEAR, MONTH)   ← il GROUP BY di Q1
-    VALORE  = (total, cancelled, delay_sum, delay_n, delay_min, delay_max)
-
-    Il valore ha già la forma dell'aggregato finale (combiner pattern), così
-    reduceByKey può combinare due valori con la stessa funzione.
-    """
+    # Chiave di aggregazione, in previsione di reduceByKey
     key = (r["OP_UNIQUE_CARRIER"], r["YEAR"], r["MONTH"])
 
-    # Cancellazione: conta su TUTTI i voli. CANCELLED è double (0.0/1.0), può essere null.
+    # Se il volo è cancellazione, allora conta su TUTTI i voli.
+    # CANCELLED è double (0.0/1.0), ma può essere anche null (None).
     cancelled = 1 if (r["CANCELLED"] is not None and r["CANCELLED"] == 1.0) else 0
 
     dep = r["DEP_DELAY"]
     if cancelled == 0 and dep is not None:
-        # Volo valido per le statistiche: contribuisce con il suo ritardo (1 osservazione).
+        # Volo non cancellato, per cui contribuisce con il suo ritardo e vale come una singola osservazione.
+
         dep = float(dep)
         delay_sum, delay_n, delay_min, delay_max = dep, 1, dep, dep
     else:
-        # Volo cancellato o senza ritardo: contributo NEUTRO. +inf/-inf = elementi
-        # neutri di min/max, non sporcano gli estremi nello step di reduce.
-        delay_sum, delay_n, delay_min, delay_max = 0.0, 0, float("inf"), float("-inf")
+        # Volo cancellato o senza ritardo, non contribuisce alla somma né al conteggio dei ritardi.
+        # Si tratta comunque di un volo valido per il totale e le cancellazioni.
+
+        delay_sum, delay_n, delay_min, delay_max = 0.0, 0, float("inf"), float("-inf") # +inf/-inf come elementi neutri di min/max
 
     return key, (1, cancelled, delay_sum, delay_n, delay_min, delay_max)
 
 
 def combine(a, b):
-    """Fonde due aggregati parziali della stessa chiave (associativo + commutativo)."""
+
     return (
         a[0] + b[0],        # total_flights
         a[1] + b[1],        # cancelled_flights
@@ -97,7 +67,7 @@ def combine(a, b):
 
 
 def finalize(v):
-    """Aggregato grezzo → metriche finali (operazioni non associative: media e %)."""
+
     total, cancelled, delay_sum, delay_n, delay_min, delay_max = v
 
     cancellation_rate = round(cancelled / total * 100, 4)
@@ -111,81 +81,87 @@ def finalize(v):
 
     return total, cancelled, cancellation_rate, avg_delay, min_delay, max_delay
 
+def main():
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Pipeline lazy — nessun calcolo eseguito finché non scatta l'action finale
-# ─────────────────────────────────────────────────────────────────────────────
-#
-# Leggiamo solo le 5 colonne utili (column pruning del Parquet), poi passiamo
-# all'RDD. filter/map/reduceByKey/mapValues sono tutte TRASFORMAZIONI lazy:
-# qui Spark costruisce solo il piano di esecuzione (lineage).
-result_rdd = (
-    spark.read.parquet(HDFS_INPUT)
-    .select("OP_UNIQUE_CARRIER", "YEAR", "MONTH", "CANCELLED", "DEP_DELAY")
-    .rdd
-    .filter(lambda r: r["OP_UNIQUE_CARRIER"] in ("AA", "DL"))  # solo AA/DL
-    .map(to_pair)                                              # → (chiave, parziale)
-    .reduceByKey(combine)                                      # SHUFFLE + map-side combine
-    .mapValues(finalize)                                       # divisioni finali (no shuffle)
-)
+    spark = build_spark_session(
+        app_name="Q1_RDD_AA_DL_monthly_stats",
+        master=SPARK_MASTER,
+        ui_enabled=True,
+        ui_port="4040",
+    )
 
-# cache(): chiediamo a Spark di TENERE IN MEMORIA il risultato (8 righe) dopo
-# la prima action. Avremo DUE action sotto (collect per il CSV locale,
-# saveAsTextFile per HDFS): senza cache, la seconda rieseguirebbe da capo
-# lettura + shuffle. Con cache, la seconda riusa i dati già materializzati.
-result_rdd.cache()
+    # Spark Context
+    sc = spark.sparkContext
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Action #1: collect() → CSV locale + misura del tempo di calcolo
-# ─────────────────────────────────────────────────────────────────────────────
-# È questa la prima e unica esecuzione "pesante" della pipeline (read + shuffle).
-# Sicuro perché il risultato è minuscolo (2 vettori × 4 mesi = 8 righe).
-# L'ordinamento lo facciamo in Python sul driver: su 8 righe non vale la pena
-# di un sortBy distribuito (che farebbe partire un job extra di sampling).
-t0 = time.time()
-collected = result_rdd.collect()
-elapsed = time.time() - t0
 
-# (chiave, valore) → riga piatta, ordinata per (carrier, year, month).
-rows = [
-    [carrier, year, month, *metrics]
-    for (carrier, year, month), metrics in sorted(collected)
-]
+    ### Calcolo Q1 con RDD ###
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Output a schermo + salvataggio CSV locale (dir montata → visibile sull'host)
-# ─────────────────────────────────────────────────────────────────────────────
-show_rdd_result(
-    rows=rows,
-    header=HEADER,
-    query_name="Q1 RDD",
-    elapsed=elapsed,
-)
-save_rdd_csv_local(
-    path=LOCAL_OUT,
-    header=HEADER,
-    rows=rows,
-)
+    # Calcolo tempo iniziale
+    t0 = time.time()
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Action #2: salvataggio su HDFS (riusa il risultato in cache → niente ricalcolo)
-# ─────────────────────────────────────────────────────────────────────────────
-save_rdd_csv_hdfs(
-    sc=sc,
-    path=HDFS_OUTPUT,
-    header=HEADER,
-    data_rdd=result_rdd.sortByKey(),
-    row_mapper=lambda kv: [
-        kv[0][0],
-        kv[0][1],
-        kv[0][2],
-        *kv[1],
-    ],
-)
-print(f"{'='*70}\n")
+    # Spark costruisce solo il piano di esecuzione (lineage), trattandosi di Trasformazioni (lazy).
+    result_rdd = (
+        spark.read.parquet(HDFS_INPUT)
+        .select("OP_UNIQUE_CARRIER", "YEAR", "MONTH", "CANCELLED", "DEP_DELAY") # Leggiamo solo le 5 colonne utili column pruning del Parquet)
+        .rdd
+        .filter(lambda r: r["OP_UNIQUE_CARRIER"] in ("AA", "DL"))  # solo AA/DL
+        .map(to_key_value) # passaggio a struttura (chiave, valore parziale)
+        .reduceByKey(combine) # combinazione basata su aggregazione
+        .mapValues(finalize) # applicazione funzione di finalizzazione senza modificare le chiavi
+    )
 
-if os.getenv("SPARK_DEBUG_UI", "0") == "1":
-    print("\nSpark UI attiva. Apri http://localhost:4040 per vedere il DAG.")
-    input("Premi INVIO per terminare l'applicazione...")
+    # cache(): chiediamo a Spark di TENERE IN MEMORIA il risultato di questa RDD,
+    # perché lo riutilizzeremo per due azioni consecutive (collect e salvataggio su HDFS).
+    result_rdd.cache()
 
-spark.stop()
+    # Esecuzione
+    collected = result_rdd.collect()
+
+    # Calcolo tempo trascorso
+    elapsed = time.time() - t0
+
+    # (chiave, valore) -> riga piatta, ordinata per (carrier, year, month).
+    rows = [
+        [carrier, year, month, *metrics]
+        for (carrier, year, month), metrics in sorted(collected)
+    ]
+
+    # Output a schermo
+    show_rdd_result(
+        rows=rows,
+        header=HEADER,
+        query_name="Q1 RDD",
+        elapsed=elapsed,
+    )
+
+    # Salvataggio CSV locale
+    save_rdd_csv_local(
+        path=LOCAL_OUT,
+        header=HEADER,
+        rows=rows,
+    )
+
+    # Salvataggio su HDFS (riusa il risultato in cache, per cui niente ricalcolo)
+    save_rdd_csv_hdfs(
+        sc=sc,
+        path=HDFS_OUTPUT,
+        header=HEADER,
+        data_rdd=result_rdd.sortByKey(),
+        row_mapper=lambda kv: [
+            kv[0][0],
+            kv[0][1],
+            kv[0][2],
+            *kv[1],
+        ],
+    )
+    print(f"{'='*70}\n")
+
+    if os.getenv("SPARK_DEBUG_UI", "0") == "1":
+        print("\nSpark UI attiva. Apri http://localhost:4040 per vedere il DAG.")
+        input("Premi INVIO per terminare l'applicazione...")
+
+    spark.stop()
+
+
+if __name__ == "__main__":
+    main()
