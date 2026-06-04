@@ -1,39 +1,3 @@
-"""
-Export query results to Redis.
-
-Reads the RDD query results **directly from HDFS** (le directory in cui i job
-Spark scrivono i risultati) and writes them to Redis for the Grafana dashboards.
-
-Leggere da HDFS — invece dei CSV locali in results/, che ne sono solo una copia
-coalesce(1) — è ciò che chiede la specifica: "esportare risultati da HDFS a
-storage (Redis)".
-
-Key schema
-----------
-Q1  HASH  q1:{carrier}:{year}:{month}
-          fields: total_flights, cancelled_flights, cancellation_rate_pct,
-                  avg_dep_delay, min_dep_delay, max_dep_delay
-
-Q2  ZSET  q2:ranking           (score = avg_arr_delay, member = carrier)
-    HASH  q2:{carrier}
-          fields: num_flights, avg_arr_delay, avg_carrier_delay,
-                  avg_weather_delay, avg_nas_delay, avg_security_delay,
-                  avg_late_aircraft_delay
-
-Q3  HASH  q3:percentiles:{carrier}:{hour}
-          fields: p25, p50, p75, p90
-    HASH  q3:range:{carrier}
-          fields: min_delay, max_delay
-
-Usage (inside spark-master container):
-  /opt/spark/bin/spark-submit /opt/spark/jobs/export_to_redis.py
-
-Environment variables:
-  REDIS_HOST    (default: redis)
-  REDIS_PORT    (default: 6379)
-  SPARK_MASTER  (default: spark://spark-master:7077)
-"""
-
 from __future__ import annotations
 
 import os
@@ -57,14 +21,13 @@ Q3_RNG_PATH     = f"{HDFS_RESULTS}/q3_rdd/delay_range"
 CLUSTERING_PATH = f"{HDFS_RESULTS}/clustering_base"
 
 # Schema dei CSV RDD su HDFS (gli output saveAsTextFile non hanno un header
-# affidabile su più part-file → lo passiamo esplicito, vedi read_csv).
-COLS_Q1     = ["OP_UNIQUE_CARRIER", "YEAR", "MONTH", "total_flights",
-               "cancelled_flights", "cancellation_rate_pct",
-               "avg_dep_delay", "min_dep_delay", "max_dep_delay"]
-COLS_Q2     = ["OP_UNIQUE_CARRIER", "num_flights", "avg_arr_delay",
-               "avg_carrier_delay", "avg_weather_delay", "avg_nas_delay",
-               "avg_security_delay", "avg_late_aircraft_delay"]
+#  passiamo esplicitamente le colonne).
+COLS_Q1     = ["OP_UNIQUE_CARRIER", "YEAR", "MONTH", "total_flights","cancelled_flights", "cancellation_rate_pct","avg_dep_delay", "min_dep_delay", "max_dep_delay"]
+
+COLS_Q2     = ["OP_UNIQUE_CARRIER", "num_flights", "avg_arr_delay","avg_carrier_delay", "avg_weather_delay", "avg_nas_delay","avg_security_delay", "avg_late_aircraft_delay"]
+
 COLS_Q3_PCT = ["OP_UNIQUE_CARRIER", "hour", "p25", "p50", "p75", "p90"]
+
 COLS_Q3_RNG = ["OP_UNIQUE_CARRIER", "min_delay", "max_delay"]
 
 MONTH_LABELS = {"1": "Jan", "2": "Feb", "3": "Mar", "4": "Apr"}
@@ -77,49 +40,41 @@ def connect() -> redis.Redis:
     return r
 
 
-# ── HDFS readers ────────────────────────────────────────────────────────────--
-
+#HDFS readers
 def hdfs_exists(spark, path: str) -> bool:
+    #accesso alla jvm su cui si trova spark
     jvm   = spark._jvm
+    #recupera configurazione attuale di hadoop
     hconf = spark._jsc.hadoopConfiguration()
+    #accede e verifica che esista
     fs    = jvm.org.apache.hadoop.fs.FileSystem.get(jvm.java.net.URI(path), hconf)
     return fs.exists(jvm.org.apache.hadoop.fs.Path(path))
 
 
 def read_csv(spark, path: str, columns: list[str] | None = None) -> list[dict]:
-    """Legge una directory CSV da HDFS → lista di dict {colonna: str}.
-
-    Gli output RDD (saveAsTextFile) scrivono l'header come semplice riga di
-    testo: con più part-file Spark non sa quale sia l'header, quindi passiamo
-    `columns` esplicite (header=False) e scartiamo le righe-header eventualmente
-    finite tra i dati. Gli output DataFrame (clustering) hanno un header
-    affidabile → columns=None.
-
-    I valori restano stringhe (come csv.DictReader); i null diventano "".
-    Ritorna [] se il path non esiste su HDFS.
-    """
     if not hdfs_exists(spark, path):
         print(f"  [SKIP] {path} non trovato su HDFS")
         return []
 
+    #struttura colonne non necessaria solo per la lettura del clustering
     if columns is None:
         df = spark.read.csv(path, header=True)
         return [
             {k: ("" if v is None else v) for k, v in row.asDict().items()}
             for row in df.collect()
         ]
-
+    #i dati sono divisi in più file quindi usa l'header definito precedentemente
     df = spark.read.csv(path, header=False)
     rows: list[dict] = []
     for row in df.collect():
         rec = {c: ("" if v is None else v) for c, v in zip(columns, row)}
-        if rec.get(columns[0]) == columns[0]:   # riga header finita tra i dati
+        if rec.get(columns[0]) == columns[0]:   # riga header finita tra i dati quindi la saltiamo
             continue
         rows.append(rec)
     return rows
 
 
-# ── Q1 ────────────────────────────────────────────────────────────────────────
+# Q1
 
 def export_q1(r: redis.Redis, rows: list[dict]) -> int:
     written = 0
@@ -136,11 +91,12 @@ def export_q1(r: redis.Redis, rows: list[dict]) -> int:
             "min_dep_delay":          row["min_dep_delay"],
             "max_dep_delay":          row["max_dep_delay"],
         })
+        #risultato finale: q1:AA:2025:1 → {total_flights:..., cancelled_flights:..., ...}
         written += 1
     return written
 
 
-# ── Q2 ────────────────────────────────────────────────────────────────────────
+# Q2
 
 def export_q2(r: redis.Redis, rows: list[dict]) -> int:
     written = 0
@@ -150,8 +106,8 @@ def export_q2(r: redis.Redis, rows: list[dict]) -> int:
 
         # ZSET for ranking (score = avg_arr_delay)
         r.zadd("q2:ranking", {carrier: avg_arr})
+        #sorted set per il ranking
 
-        # HASH for full metrics
         r.hset(f"q2:{carrier}", mapping={
             "num_flights":              row["num_flights"],
             "avg_arr_delay":            row["avg_arr_delay"],
@@ -161,11 +117,12 @@ def export_q2(r: redis.Redis, rows: list[dict]) -> int:
             "avg_security_delay":       row["avg_security_delay"],
             "avg_late_aircraft_delay":  row["avg_late_aircraft_delay"],
         })
+        #risultato finale: q2:AA → {num_flights:..., avg_arr_delay:..., ...}
         written += 1
     return written
 
 
-# ── Q3 ────────────────────────────────────────────────────────────────────────
+# Q3
 
 def export_q3(r: redis.Redis, pct_rows: list[dict], rng_rows: list[dict]) -> tuple[int, int]:
     pct_written = 0
@@ -190,37 +147,15 @@ def export_q3(r: redis.Redis, pct_rows: list[dict], rng_rows: list[dict]) -> tup
         })
         rng_written += 1
 
+    #due hash separati sempre stesso discorso, in uno i percentili nell'altro i min/max
+
     return pct_written, rng_written
 
 
-# ── Grafana visualization keys ────────────────────────────────────────────────
-#
-# Chiavi aggregate pensate per le dashboard Grafana (redis-datasource plugin).
-# Usano HGETALL su hash aggregati invece di mille HGET separati.
-#
-# Schema:
-#   Q1  HASH  q1:viz:{carrier}:avg_dep_delay        field=Mon  value=float
-#       HASH  q1:viz:{carrier}:cancellation_rate     field=Mon  value=float
-#
-#   Q2  HASH  q2:viz:avg_{component}_delay           field=carrier  value=float
-#             (components: carrier, weather, nas, security, late_aircraft)
-#       NB: il ranking per avg_arr_delay NON ha una viz dedicata — il barchart
-#           lo legge direttamente dallo ZSET canonico q2:ranking (ZRANGE WITHSCORES,
-#           che il redis-datasource restituisce con lo stesso frame di HGETALL).
-#
-#   Q3  HASH  q3:viz:{carrier}:{pct}                field=HH   value=float
-#             (pct: p25, p50, p75, p90; HH: "00".."23")
-#
-#   Clustering  HASH  clustering:carrier:{carrier}   fields: feature + prediction
-#               HASH  clustering:assignments          {carrier → cluster_id}
-#               HASH  clustering:viz:{metric}         {carrier → valore}  (5 metriche)
-#               HASH  clustering:meta                 {k, n_carriers}
-
 def export_grafana_viz(r: redis.Redis, q1_rows: list[dict], q2_rows: list[dict],
                        q3_pct_rows: list[dict]) -> None:
-    """Crea chiavi Redis aggregate per le dashboard Grafana."""
 
-    # ── Q1 ────────────────────────────────────────────────────────────────────
+    # Q1
     if q1_rows:
         # Inseriamo i field in ordine di mese: Redis conserva l'ordine d'inserimento
         # per gli hash piccoli (listpack), così HGETALL li ritorna Jan→Apr e il
@@ -232,7 +167,7 @@ def export_grafana_viz(r: redis.Redis, q1_rows: list[dict], q2_rows: list[dict],
             r.hset(f"q1:viz:{carrier}:cancellation_rate", month, row["cancellation_rate_pct"])
         print("  Q1 viz: q1:viz:{carrier}:avg_dep_delay  |  q1:viz:{carrier}:cancellation_rate")
 
-    # ── Q2 ────────────────────────────────────────────────────────────────────
+    # Q2
     components = [
         "avg_carrier_delay", "avg_weather_delay", "avg_nas_delay",
         "avg_security_delay", "avg_late_aircraft_delay",
@@ -245,7 +180,7 @@ def export_grafana_viz(r: redis.Redis, q1_rows: list[dict], q2_rows: list[dict],
                 r.hset(f"q2:viz:{comp}", carrier, row[comp])
         print("  Q2 viz: q2:viz:avg_*_delay  (avg_arr_delay → ZSET canonico q2:ranking)")
 
-    # ── Q3 ────────────────────────────────────────────────────────────────────
+    # Q3
     if q3_pct_rows:
         for row in q3_pct_rows:
             carrier = row["OP_UNIQUE_CARRIER"]
@@ -253,19 +188,6 @@ def export_grafana_viz(r: redis.Redis, q1_rows: list[dict], q2_rows: list[dict],
             for pct in ["p25", "p50", "p75", "p90"]:
                 r.hset(f"q3:viz:{carrier}:{pct}", hour, row[pct])
         print("  Q3 viz: q3:viz:{carrier}:{p25|p50|p75|p90}  (field = ora 00–23)")
-
-
-# ── Clustering ────────────────────────────────────────────────────────────────
-#
-# CSV prodotto da clustering_base.py (HDFS: /sabd/results/clustering_base/):
-#   OP_UNIQUE_CARRIER, total_flights, <8 feature>, prediction
-#
-# Chiavi Redis:
-#   clustering:carrier:{carrier}    HASH  tutte le colonne (dettaglio tabella)
-#   clustering:assignments          HASH  {carrier → cluster_id}          (dashboard viz)
-#   clustering:viz:avg_dep_delay    HASH  {carrier → valore}              (barchart)
-#   clustering:viz:cancellation_rate HASH {carrier → valore}              (barchart)
-#   clustering:meta                 HASH  {k, n_carriers}
 
 CLUSTERING_VIZ_METRICS = [
     "avg_dep_delay", "avg_arr_delay", "cancellation_rate",
@@ -305,7 +227,7 @@ def export_clustering(r: redis.Redis, rows: list[dict]) -> int:
     return len(rows)
 
 
-# ── Main ──────────────────────────────────────────────────────────────────────
+# Main
 
 def main():
     spark = build_spark_session(app_name="export_to_redis", master=SPARK_MASTER)
@@ -328,15 +250,15 @@ def main():
         pct, rng = export_q3(r, q3_pct_rows, q3_rng_rows)
         print(f"Q3: {pct} percentile keys + {rng} range keys written")
 
-        print("\n── Grafana viz keys ────────────────────────────────────────────")
+        print("\n── Grafana viz keys ")
         export_grafana_viz(r, q1_rows, q2_rows, q3_pct_rows)
 
         n = export_clustering(r, clust_rows)
         if n:
             print(f"Clustering: {n} carrier keys written  (clustering:carrier:{{carrier}} + viz)")
 
-        # ── Spot-check: print a few keys ─────────────────────────────────────
-        print("\n── Spot-check ──────────────────────────────────────────────────")
+        # Spot-check: print a few keys
+        print("\n── Spot-check ")
         sample = r.hgetall("q1:AA:2025:1")
         print(f"q1:AA:2025:1  →  {sample}")
 
@@ -354,7 +276,7 @@ def main():
 
         viz_q3 = r.hgetall("q3:viz:AA:p50")
         print(f"q3:viz:AA:p50 (first 5 hours)  →  { {k: viz_q3[k] for k in sorted(viz_q3)[:5]} }")
-        print("────────────────────────────────────────────────────────────────")
+
     finally:
         spark.stop()
 

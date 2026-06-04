@@ -1,25 +1,3 @@
-"""
-utils_clustering.py — funzioni condivise dai due studi di clustering
-(clustering_base.py e clustering_extended.py), parametrizzate sulla lista di
-feature e sui path di output così da garantire un confronto a parità di
-pipeline (StandardScaler, elbow+silhouette, KMeans, PCA).
-
-Contenuto:
-  feature_expressions()      registry  nome_feature -> espressione Spark (Column)
-  load_and_select_carriers() top-N carrier per numero voli
-  aggregate_features()       aggregazione per carrier delle sole feature richieste
-  build_scaled_features()    VectorAssembler -> StandardScaler (mean=0, std=1)
-  find_best_k()              elbow (WSSSE) + silhouette per k nel range -> best_k
-  run_final_kmeans()         KMeans con k ottimale
-  pca_scatter_plot()         PCA 2D -> scatter PNG con label carrier
-  profile_clusters()         heatmap z-score dei centroidi + tabella delta (CSV)
-  correlation_clustermap()   (solo extended) clustermap Pearson + verdetto feature
-  export_k_metrics()         CSV con WSSSE/Silhouette per k (per il confronto)
-  print_results() / export_results()
-
-I plot usano solo matplotlib + numpy + scipy (no seaborn/pandas), coerente con
-l'immagine Spark del progetto (vedi spark/Dockerfile).
-"""
 import csv
 
 import matplotlib
@@ -38,27 +16,13 @@ from pyspark.ml.clustering import KMeans
 from pyspark.ml.evaluation import ClusteringEvaluator
 
 
-# ── Registry delle feature ────────────────────────────────────────────────────
+# Registry delle feature
 def feature_expressions():
-    """Mappa nome_feature -> espressione Spark aggregata (per groupBy carrier).
-
-    Identiche a quelle storiche di clustering.py, così che la versione base e
-    quella extended condividano esattamente la stessa definizione di ciascuna
-    feature e il confronto sia legittimo.
-    """
     # cause di ritardo (NULL -> 0) sui soli voli non cancellati, riusate per la
     # composizione "controllable" (carrier + late aircraft) vs totale delle 5 cause.
-    _nc           = col("CANCELLED") == 0
-    _carrier      = coalesce(col("CARRIER_DELAY"),       lit(0.0))
-    _weather      = coalesce(col("WEATHER_DELAY"),       lit(0.0))
-    _nas          = coalesce(col("NAS_DELAY"),           lit(0.0))
-    _security     = coalesce(col("SECURITY_DELAY"),      lit(0.0))
-    _late         = coalesce(col("LATE_AIRCRAFT_DELAY"), lit(0.0))
-    _controllable = _carrier + _late
-    _total_cause  = _carrier + _weather + _nas + _security + _late
 
     return {
-        # ── 8 feature richieste dalla traccia ───────────────────────────────
+        # feature richieste dalla traccia
         "avg_dep_delay": spark_round(
             avg(when(col("CANCELLED") == 0, col("DEP_DELAY"))), 4),
         "avg_arr_delay": spark_round(
@@ -75,7 +39,7 @@ def feature_expressions():
             avg(when(col("CANCELLED") == 0, coalesce(col("SECURITY_DELAY"), lit(0.0)))), 4),
         "avg_late_aircraft": spark_round(
             avg(when(col("CANCELLED") == 0, coalesce(col("LATE_AIRCRAFT_DELAY"), lit(0.0)))), 4),
-        # ── 4 feature aggiunte (solo versione extended) ─────────────────────
+        #3 feature aggiunte (solo versione extended)
         "std_dep_delay": spark_round(
             stddev(when(col("CANCELLED") == 0, col("DEP_DELAY"))), 4),
         "on_time_rate": spark_round(
@@ -87,9 +51,8 @@ def feature_expressions():
     }
 
 
-# ── 1. Caricamento e selezione carrier ────────────────────────────────────────
+#  Caricamento e selezione top carrier
 def load_and_select_carriers(df_raw, top_n):
-
 
     top_carriers = (
         df_raw.groupBy("OP_UNIQUE_CARRIER")
@@ -104,7 +67,7 @@ def load_and_select_carriers(df_raw, top_n):
     return df_raw.filter(col("OP_UNIQUE_CARRIER").isin(carrier_list))
 
 
-# ── 2. Aggregazione delle sole feature richieste ──────────────────────────────
+#  Aggregazione delle sole feature richieste
 def aggregate_features(df, feature_cols):
     exprs = feature_expressions()
     agg_exprs = [count("*").alias("total_flights")] + [exprs[c].alias(c) for c in feature_cols]
@@ -119,7 +82,7 @@ def aggregate_features(df, feature_cols):
     return features_df
 
 
-# ── 3. Pipeline ML: VectorAssembler → StandardScaler ──────────────────────────
+# Pipeline ML: VectorAssembler → StandardScaler
 def build_scaled_features(features_df, feature_cols):
     assembler = VectorAssembler(inputCols=feature_cols, outputCol="features_raw")
     scaler    = StandardScaler(inputCol="features_raw", outputCol="features",
@@ -128,7 +91,7 @@ def build_scaled_features(features_df, feature_cols):
     return prep_model.transform(features_df)
 
 
-# ── 4. Elbow + Silhouette per k nel range ─────────────────────────────────────
+# Elbow + Silhouette per k nel range
 def find_best_k(df_scaled, k_range, out_png_elbow):
     evaluator = ClusteringEvaluator(featuresCol="features", predictionCol="prediction",
                                     metricName="silhouette",
@@ -178,7 +141,7 @@ def find_best_k(df_scaled, k_range, out_png_elbow):
     return best_k, k_values, wssse_list, silhouette_list
 
 
-# ── 5. KMeans finale con k ottimale ───────────────────────────────────────────
+# KMeans finale con k ottimale
 def run_final_kmeans(df_scaled, best_k):
     km_model = KMeans(featuresCol="features", k=best_k, seed=42, maxIter=100, initSteps=10).fit(df_scaled)
     return km_model.transform(df_scaled)

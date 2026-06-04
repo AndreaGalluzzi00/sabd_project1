@@ -9,7 +9,7 @@ from utils import build_spark_session
 import utils_clustering as uc
 
 
-# ── Configurazione generale ──────────────────────────────────────────────────
+# Configurazione generale
 
 SPARK_MASTER = os.getenv("SPARK_MASTER", "spark://spark-master:7077")
 
@@ -23,8 +23,7 @@ K_RANGE = range(2, 7)
 os.makedirs(RESULTS_DIR, exist_ok=True)
 
 
-# ── Feature ──────────────────────────────────────────────────────────────────
-
+# Feature
 BASE_COLS = [
     "avg_dep_delay",
     "avg_arr_delay",
@@ -36,14 +35,14 @@ BASE_COLS = [
     "avg_late_aircraft",
 ]
 
+# Feature Extra
 EXTRA_COLS = [
     "std_dep_delay",
     "on_time_rate",
     "diverted_rate",
 ]
 
-# ── Studi da eseguire ─────────────────────────────────────────────────────────
-
+# Studi da eseguire: ogni studio è una configurazione completa di feature, output, ecc.
 STUDIES = [
     {
         "name": "base",
@@ -77,16 +76,18 @@ STUDIES = [
     },
 ]
 
-
-
-
+#guarda utils clustering
 def run_study(df, study):
 
     name = study["name"]
     label = study["label"]
     feature_cols = study["feature_cols"]
 
-    uc.print_study_header(label, feature_cols)
+    print("\n" + "=" * 90)
+    print(f"CLUSTERING {label}")
+    print("=" * 90)
+    print(f"Numero feature: {len(feature_cols)}")
+    print("Feature usate:")
 
     t0 = time.time()
 
@@ -150,12 +151,8 @@ def run_study(df, study):
 
     return summary
 
-
+#exporting in csv
 def export_comparison_summary(rows, out_csv):
-    """
-    Esporta il confronto finale BASE vs EXTENDED.
-    """
-
     fieldnames = [
         "study",
         "label",
@@ -179,10 +176,6 @@ def export_comparison_summary(rows, out_csv):
 
 
 def print_comparison_summary(rows):
-    """
-    Stampa confronto finale tra BASE ed EXTENDED.
-    """
-
     print("\n" + "=" * 90)
     print("CONFRONTO FINALE — BASE vs EXTENDED")
     print("=" * 90)
@@ -220,6 +213,7 @@ def print_comparison_summary(rows):
 
 
 def main():
+    # Costruisce sessione spark
     spark = build_spark_session(app_name="Clustering_Study_Base_vs_Extended",master=SPARK_MASTER)
     print("CLUSTERING STUDY — BASE vs EXTENDED")
     print(f"Input HDFS: {HDFS_INPUT}")
