@@ -1,20 +1,3 @@
-"""
-Q3 — Percentili DEP_DELAY per compagnia e fascia oraria
-Implementazione con t-digest via RDD API
-
-t-digest (Dunning, 2019): struttura a centroidi pesati con errore adattivo.
-A differenza di percentile_approx (Greenwald-Khanna, errore uniforme),
-t-digest garantisce errore relativo minore sulle code (p90, p95, p99)
-rispetto al centro (p50) — proprietà utile per analisi di ritardi estremi.
-
-La mergeability nativa dei digest permette una pipeline distribuita corretta:
-  - ogni nodo accumula un digest locale (combineByKey, fase map-side)
-  - i digest locali vengono mergiati senza riaggregare i dati originali
-  - nessuno shuffle dei dati grezzi, solo trasferimento di strutture compatte
-
-Parametro delta (compressione): default 0.01
-  - valori più bassi → più centroidi → maggiore precisione → più memoria
-"""
 import os
 import sys
 import time
@@ -66,11 +49,12 @@ t0 = time.time()
 
 # ── Percentili via RDD + t-digest ─────────────────────────────────────────────
 #
-# combineByKey è preferibile ad aggregateByKey perché usa una factory
+# combineByKey preferibile ad aggregateByKey perché usa una factory
 # (create_combiner) invece di un valore zero condiviso — evita il problema
 # di mutare lo stesso oggetto TDigest su chiavi diverse nella stessa partizione.
-#
-# Pipeline:
+
+
+# Pipeline di tdigest
 #   create_combiner : prima occorrenza di una chiave → crea un nuovo TDigest
 #   merge_value     : occorrenze successive nella stessa partizione → update
 #   merge_combiners : riduzione tra partizioni → merge dei centroidi

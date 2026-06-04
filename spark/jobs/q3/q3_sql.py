@@ -35,6 +35,7 @@ df.createOrReplaceTempView("flights")
 
 t0 = time.time()
 
+#NB i NULL in dep_delay vengono ignorati per natura di spark e la divisione  per 100 serve a rimappare sulle fasce orarie
 percentiles = spark.sql("""
     SELECT
         OP_UNIQUE_CARRIER,
@@ -56,7 +57,7 @@ percentiles = spark.sql("""
 
     ORDER BY
         OP_UNIQUE_CARRIER,
-        hour
+        FLOOR(CRS_DEP_TIME / 100)
 """)
 
 delay_range = spark.sql("""
@@ -110,6 +111,8 @@ save_csv_local(
     rows=range_rows,
 )
 
+#Ricordiamo che le query sono separate per più motivi,hanno granularità diverse a livello di order by ed inotre la query dei percentili restituisce 4 (carrier) x 24 (ore del giorno) righe
+#Mentre per il calcolo dei min e max abbiamo bisogno solo di 1 riga per cisascun carrier ovvero 4 righe
 save_dataframe_hdfs(percentiles, HDFS_OUTPUT_PERCENTILES)
 save_dataframe_hdfs(delay_range, HDFS_OUTPUT_RANGE)
 

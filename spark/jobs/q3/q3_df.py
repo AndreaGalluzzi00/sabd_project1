@@ -33,11 +33,13 @@ df = (
         (col("CANCELLED") == 0)
     )
     .withColumn("hour", floor(col("CRS_DEP_TIME") / 100))
+    #crea una nuova colonna con alias hour
 )
 # Calcolo Percentili
 
 t0 = time.time()
 
+#calcolo percentili sempre tramite percentile_approx, efficiente
 percentiles = (
     df.groupBy("OP_UNIQUE_CARRIER", "hour")
     .agg(
@@ -49,6 +51,7 @@ percentiles = (
     .orderBy("OP_UNIQUE_CARRIER", "hour")
 )
 
+#Query separata per il calcolo di minimo e massimo come negli altri casi, abbiamo un livello di granularità diverso sul group by ed inoltre una cardinalità differente nei risultati
 delay_range = (
     df.groupBy("OP_UNIQUE_CARRIER")
     .agg(
@@ -58,6 +61,7 @@ delay_range = (
     .orderBy("OP_UNIQUE_CARRIER")
 )
 
+#caching per evitarne il ricalcolo
 percentiles.cache()
 delay_range.cache()
 
@@ -81,7 +85,7 @@ show_dataframe_result(
     n=20,
 )
 
-# Salvataggio CSV locale (directory montata → visibile sull'host)
+# Salvataggio CSV
 
 save_csv_local(
     path=LOCAL_OUT_PERCENTILES,
@@ -95,6 +99,7 @@ save_csv_local(
     rows=range_rows,
 )
 
+#Salvataggio anche in remoto su hdfs
 save_dataframe_hdfs(percentiles, HDFS_OUTPUT_PERCENTILES)
 save_dataframe_hdfs(delay_range, HDFS_OUTPUT_RANGE)
 

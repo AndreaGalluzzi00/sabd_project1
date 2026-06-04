@@ -1,26 +1,3 @@
-"""
-Q3 (RDD) — Percentili DEP_DELAY per compagnia e fascia oraria
-Versione della famiglia "approximate di Spark" con le API RDD.
-
-NOTA IMPORTANTE — le API RDD non espongono percentile_approx / approxQuantile:
-l'algoritmo (Greenwald-Khanna) vive nel motore SQL/Catalyst ed è disponibile
-solo su DataFrame e Spark SQL (vedi q3_df.py e q3_sql.py). Questa versione RDD
-raggruppa i valori per (compagnia, fascia oraria) con groupByKey e calcola i
-percentili in modo ESATTO via ordinamento + interpolazione lineare.
-
-È quindi il RIFERIMENTO ESATTO contro cui confrontare le stime approssimate:
-  - percentile_approx (q3_df.py / q3_sql.py)
-  - KLL sketch        (q3_kll*.py)
-  - t-digest          (q3_tdigest*.py)
-
-Scalabilità: groupByKey materializza tutti i valori di un gruppo in memoria.
-Accettabile su questo dataset (4 compagnie × 24 fasce). Gli sketch sono
-precisamente l'alternativa che evita questa materializzazione.
-
-Modalità:
-  - Dev locale (Mac M1):  SPARK_MASTER=local[2]  (default)
-  - Cluster / EC2:        SPARK_MASTER=spark://spark-master:7077
-"""
 import math
 import os
 import sys
@@ -59,6 +36,7 @@ spark = build_spark_session(
 )
 sc = spark.sparkContext
 
+#qui esplicitiamo il drop null su dep_delay nelle altre versioni no ma lo fa di default il percentile_approx
 df = (
     spark.read.parquet(HDFS_INPUT)
     .filter(
@@ -71,10 +49,7 @@ df = (
 )
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Percentile esatto su lista ordinata (interpolazione lineare, metodo 'linear'
-# / type-7 di NumPy). Eseguito sugli executor dentro mapValues.
-# ─────────────────────────────────────────────────────────────────────────────
+# Percentile esatto su lista ordinata (interpolazione lineare). Eseguito sugli executor dentro mapValues.
 def percentile(sorted_vals, q):
     n = len(sorted_vals)
     if n == 0:
@@ -91,6 +66,8 @@ def percentile(sorted_vals, q):
 
 
 def quantiles(values_iter):
+    #attenzione perchè il values_iter è un iteratore non una lista, che prendiamo da groupbykey
+    #in sorted avviene la vera materializzazione dell'iteratore in una listya
     vals = sorted(values_iter)
     return (
         round(percentile(vals, 0.25), 2),
@@ -109,28 +86,30 @@ base = (
     .cache()
 )
 
-# Percentili: groupByKey per (carrier, hour) → calcolo esatto sul gruppo ordinato.
+# Percentili: groupByKey per (carrier, hour) calcolo esatto sul gruppo ordinato.
 percentile_rdd = (
     base
-    .map(lambda t: ((t[0], t[1]), t[2]))
-    .groupByKey()
-    .mapValues(quantiles)
-    .map(lambda kv: (kv[0][0], kv[0][1], *kv[1]))
+    .map(lambda t: ((t[0], t[1]), t[2]))               # chiave = (carrier, hour) valore = delay
+    .groupByKey()                                                   # raggruppa per (carrier, hour)
+    .mapValues(quantiles)                                           # calcola percentili sul gruppo solo sui valori, chiavi intatte
+    .map(lambda kv: (kv[0][0], kv[0][1], *kv[1]))      # appiattisce il risultato
     .sortBy(lambda x: (x[0], x[1]))
 )
 
 # Min/Max DEP_DELAY per compagnia.
 range_rdd = (
     base
-    .map(lambda t: (t[0], (t[2], t[2])))
-    .reduceByKey(lambda a, b: (min(a[0], b[0]), max(a[1], b[1])))
-    .sortByKey()
+    .map(lambda t: (t[0], (t[2], t[2])))  # chiave solo carrier value = (ritardo, ritardo)
+    .reduceByKey(lambda a, b: (min(a[0], b[0]), max(a[1], b[1]))) # calcolo effettivo del minimo e massimo sulle coppie
+    .sortByKey() # qui ottieni quindi (carrier, (min,max))
 )
 
+# Caching dei risultati per evitare
 percentile_rdd.cache()
 range_rdd.cache()
 
 percentile_rows = percentile_rdd.collect()
+#modifica effettivamente la struttura da [a,(b,c))] ad [a,b,c]
 range_rows = [(c, mn, mx) for c, (mn, mx) in range_rdd.collect()]
 elapsed = time.time() - t0
 
@@ -165,7 +144,7 @@ save_rdd_csv_hdfs(
     path=HDFS_OUTPUT_PERCENTILES,
     header=COLS_PERC,
     data_rdd=percentile_rdd,
-    row_mapper=lambda row: row,
+    row_mapper=lambda row: row, #appiattisce come fatto prima ma per rdd sul cluster
 )
 
 save_rdd_csv_hdfs(
