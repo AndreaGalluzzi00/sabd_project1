@@ -147,7 +147,7 @@ def run_final_kmeans(df_scaled, best_k):
     return km_model.transform(df_scaled)
 
 
-# ── 6. PCA 2D → scatter plot ──────────────────────────────────────────────────
+# PCA 2D scatter plot
 def pca_scatter_plot(df_scaled, df_result, best_k, out_png_pca, label=""):
     pca_model = PCA(k=2, inputCol="features", outputCol="pca_coords").fit(df_scaled)
     df_pca    = pca_model.transform(df_result)
@@ -194,7 +194,7 @@ def pca_scatter_plot(df_scaled, df_result, best_k, out_png_pca, label=""):
     print(f"PCA scatter plot: {out_png_pca}")
 
 
-# ── 7. Profiling dei cluster: heatmap z-score + tabella delta ─────────────────
+# Profiling dei cluster: heatmap z-score + tabella delta
 def profile_clusters(features_df, df_result, feature_cols, best_k, out_png, out_csv):
     """Interpretazione dei cluster (deliverable della traccia).
 
@@ -267,7 +267,7 @@ def profile_clusters(features_df, df_result, feature_cols, best_k, out_png, out_
               + " | ".join(f"{delta[i, j]:>+10.2f}" for j in range(len(feature_cols))))
 
 
-# ── 7b. (extended) Correlation clustermap + verdetto feature aggiunte ─────────
+#(extended) Correlation clustermap + verdetto feature aggiunte
 def correlation_clustermap(features_df, feature_cols, base_cols, extra_cols,
                            out_png, out_csv, redundancy_threshold=0.8):
     """Matrice di correlazione di Pearson (feature x feature) con ordinamento
@@ -365,7 +365,7 @@ def remove_features(feature_cols, features_to_remove):
 
     return filtered_cols
 
-# ── 8. Metriche per il confronto base vs extended ─────────────────────────────
+# Metriche per il confronto base vs extended
 def export_k_metrics(k_values, wssse_list, silhouette_list, local_csv):
     with open(local_csv, "w", newline="") as f:
         w = csv.writer(f)
@@ -375,7 +375,7 @@ def export_k_metrics(k_values, wssse_list, silhouette_list, local_csv):
     print(f"Metriche k (WSSSE/Silhouette): {local_csv}")
 
 
-# ── 9. Stampa + export risultati ──────────────────────────────────────────────
+# Stampa + export risultati
 def print_results(df_result, feature_cols, best_k, elapsed, label):
     print(f"\n{'='*70}")
     print(f"CLUSTERING [{label}] — RISULTATI  (k={best_k}, tempo: {elapsed:.2f}s)")
