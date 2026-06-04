@@ -1,25 +1,3 @@
-"""
-Q3 — Percentili DEP_DELAY per compagnia e fascia oraria
-Implementazione con KLL sketch via RDD API
-
-KLL sketch (Karnin, Lang, Liberty — FOCS 2016): struttura a livelli a cascata.
-È il primo algoritmo dimostrato ottimale per il problema dei quantili in streaming:
-raggiunge il lower bound teorico sulla memoria O(1/ε · log(1/δ)) che nessun
-algoritmo precedente (incluso Greenwald-Khanna) aveva provato di raggiungere.
-
-A differenza di t-digest (errore adattivo sulle code), KLL garantisce errore
-uniforme ε su tutti i percentili con probabilità 1-δ — garanzia probabilistica
-dimostrabilmente ottimale.
-
-La mergeability nativa di KLL permette la stessa pipeline distribuita di t-digest:
-i singoli sketch vengono mergiati cross-partizione tramite serializzazione a byte,
-senza mai aggregare i dati grezzi.
-
-Parametro k (accuratezza): default 200
-  - garanzia teorica: errore relativo sul rango ≈ 1.5 / k
-  - k=200 → errore ≈ 0.75% — sufficiente per analisi operative
-  - valori più alti → maggiore precisione → più memoria
-"""
 import os
 import sys
 import time
@@ -73,7 +51,7 @@ df = (
 
 t0 = time.time()
 
-# ── Percentili via RDD + KLL sketch ───────────────────────────────────────────
+# Percentili via RDD + KLL sketch
 #
 # Lo sketch KLL non è direttamente serializzabile da pickle (usato da Spark
 # per i task Python), quindi lo serializziamo esplicitamente in bytes prima
@@ -114,6 +92,7 @@ percentile_rdd = (
     .map(lambda kv: (
         kv[0][0],                                                          # carrier
         kv[0][1],                                                          # hour
+        # analogo a tdigest con l'aggiunta della deserialize
         round(datasketches.kll_floats_sketch.deserialize(kv[1]).get_quantile(0.25), 2),  # p25
         round(datasketches.kll_floats_sketch.deserialize(kv[1]).get_quantile(0.50), 2),  # p50
         round(datasketches.kll_floats_sketch.deserialize(kv[1]).get_quantile(0.75), 2),  # p75
@@ -164,7 +143,7 @@ save_rdd_csv_local(
     header=COLS_RANGE,
     rows=range_rows,
 )
-# ── HDFS ──────────────────────────────────────────────────────────────────────
+# HDFS
 # Salvataggio RDD con saveAsTextFile tramite utility comune.
 
 save_rdd_csv_hdfs(

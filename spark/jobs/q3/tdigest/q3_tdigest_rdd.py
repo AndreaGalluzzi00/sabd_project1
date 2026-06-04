@@ -47,17 +47,16 @@ df = (
 
 t0 = time.time()
 
-# ── Percentili via RDD + t-digest ─────────────────────────────────────────────
-#
+# Percentili via RDD + t-digest
 # combineByKey preferibile ad aggregateByKey perché usa una factory
 # (create_combiner) invece di un valore zero condiviso — evita il problema
 # di mutare lo stesso oggetto TDigest su chiavi diverse nella stessa partizione.
 
 
-# Pipeline di tdigest
-#   create_combiner : prima occorrenza di una chiave → crea un nuovo TDigest
-#   merge_value     : occorrenze successive nella stessa partizione → update
-#   merge_combiners : riduzione tra partizioni → merge dei centroidi
+# Pipeline di combining
+#   create_combiner : prima occorrenza di una chiave crea un nuovo TDigest
+#   merge_value     : occorrenze successive nella stessa partizione update
+#   merge_combiners : riduzione tra partizioni merge dei centroidi
 
 def create_combiner(value: float) -> TDigest:
     d = TDigest()
@@ -81,6 +80,9 @@ rdd = df.rdd.map(lambda row: (
     float(row.DEP_DELAY)
 ))
 
+#perchè combine by key e non aggregate by key?
+#aggregate crea lo zero value una volta per partizione ma lo riusa per tutti i calcoli della stessa andando quindi a sprcare il risultato
+# la struttura qui è ((carrier, hour ), tdigest_finale)
 percentile_rdd = (
     rdd
     .combineByKey(create_combiner, merge_value, merge_combiners)
@@ -111,17 +113,13 @@ percentile_rows = percentile_rdd.collect()
 range_rows = range_rdd.collect()
 elapsed = time.time() - t0
 
-# ─────────────────────────────────────────────────────────────────────────────
 # Output a schermo + CSV locale
-# ─────────────────────────────────────────────────────────────────────────────
 show_rdd_result(
     rows=percentile_rows,
     header=COLS_PERC,
     query_name="Q3 t-digest RDD — Percentili DEP_DELAY per compagnia e fascia oraria",
     elapsed=elapsed,
 )
-
-
 
 show_rdd_result(
     rows=range_rows,
@@ -142,12 +140,8 @@ save_rdd_csv_local(
     rows=range_rows,
 )
 
-# ─────────────────────────────────────────────────────────────────────────────
 # HDFS: salvataggio RDD puro con saveAsTextFile
-# ─────────────────────────────────────────────────────────────────────────────
-# ─────────────────────────────────────────────────────────────────────────────
 # HDFS: salvataggio RDD con saveAsTextFile tramite utility comune
-# ─────────────────────────────────────────────────────────────────────────────
 save_rdd_csv_hdfs(
     sc=sc,
     path=HDFS_OUTPUT_PERCENTILES,
