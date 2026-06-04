@@ -14,13 +14,13 @@
       {
         "identifier": "d6ebb666-88c2-31db-8d66-ae809b1b7a7f",
         "instanceIdentifier": "3ae4e854-019e-1000-3426-1fe08cf3d0e0",
-        "name": "ConvertRecord",
+        "name": "MergeRecord",
         "comments": "",
         "position": {
           "x": 56.0,
           "y": 208.0
         },
-        "type": "org.apache.nifi.processors.standard.ConvertRecord",
+        "type": "org.apache.nifi.processors.standard.MergeRecord",
         "bundle": {
           "group": "org.apache.nifi",
           "artifact": "nifi-standard-nar",
@@ -29,7 +29,10 @@
         "properties": {
           "record-writer": "2f456180-ca4c-3a4c-85b7-58a6f4ae5c95",
           "record-reader": "ecd5405d-6b24-3e00-9f44-d9516f2c4277",
-          "include-zero-record-flowfiles": "true"
+          "merge-strategy": "Bin-Packing Algorithm",
+          "min-records": "1000000000",
+          "max-records": "1000000000",
+          "max-bin-age": "30 sec"
         },
         "propertyDescriptors": {
           "record-writer": {
@@ -44,9 +47,27 @@
             "identifiesControllerService": true,
             "sensitive": false
           },
-          "include-zero-record-flowfiles": {
-            "name": "include-zero-record-flowfiles",
-            "displayName": "Include Zero Record FlowFiles",
+          "merge-strategy": {
+            "name": "merge-strategy",
+            "displayName": "Merge Strategy",
+            "identifiesControllerService": false,
+            "sensitive": false
+          },
+          "min-records": {
+            "name": "min-records",
+            "displayName": "Minimum Number of Records",
+            "identifiesControllerService": false,
+            "sensitive": false
+          },
+          "max-records": {
+            "name": "max-records",
+            "displayName": "Maximum Number of Records",
+            "identifiesControllerService": false,
+            "sensitive": false
+          },
+          "max-bin-age": {
+            "name": "max-bin-age",
+            "displayName": "Max Bin Age",
             "identifiesControllerService": false,
             "sensitive": false
           }
@@ -63,6 +84,7 @@
         "runDurationMillis": 0,
         "concurrentlySchedulableTaskCount": 1,
         "autoTerminatedRelationships": [
+          "original",
           "failure"
         ],
         "scheduledState": "ENABLED",
@@ -476,7 +498,7 @@
           "version": "1.25.0"
         },
         "properties": {
-          "filename": "${filename:substringBeforeLast('.')}.parquet"
+          "filename": "ontime_202501_202504.parquet"
         },
         "propertyDescriptors": {
           "filename": {
@@ -554,7 +576,7 @@
           "id": "d6ebb666-88c2-31db-8d66-ae809b1b7a7f",
           "type": "PROCESSOR",
           "groupId": "8311ddf1-5082-3d8d-983a-35bfdca4fd27",
-          "name": "ConvertRecord",
+          "name": "MergeRecord",
           "comments": "",
           "instanceIdentifier": "3ae4e854-019e-1000-3426-1fe08cf3d0e0"
         },
@@ -569,7 +591,7 @@
         "labelIndex": 1,
         "zIndex": 0,
         "selectedRelationships": [
-          "success"
+          "merged"
         ],
         "backPressureObjectThreshold": 10000,
         "backPressureDataSizeThreshold": "1 GB",
@@ -634,7 +656,7 @@
           "id": "d6ebb666-88c2-31db-8d66-ae809b1b7a7f",
           "type": "PROCESSOR",
           "groupId": "8311ddf1-5082-3d8d-983a-35bfdca4fd27",
-          "name": "ConvertRecord",
+          "name": "MergeRecord",
           "comments": "",
           "instanceIdentifier": "3ae4e854-019e-1000-3426-1fe08cf3d0e0"
         },
