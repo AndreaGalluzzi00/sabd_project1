@@ -16,7 +16,8 @@ from utils_output import (
 )
 from utils import build_spark_session
 
-SPARK_MASTER = os.getenv("SPARK_MASTER","spark://spark-master:7077")
+
+SPARK_MASTER = os.getenv("SPARK_MASTER", "spark://spark-master:7077")
 HDFS_INPUT   = "hdfs://namenode:9000/sabd/processed/"
 HDFS_OUTPUT  = "hdfs://namenode:9000/sabd/results/q1_df/"
 LOCAL_OUT    = "/opt/results/q1_df.csv"
@@ -24,31 +25,14 @@ LOCAL_OUT    = "/opt/results/q1_df.csv"
 os.makedirs(os.path.dirname(LOCAL_OUT), exist_ok=True)
 
 
-def main():
-
-    spark = build_spark_session(
-        app_name="Q1_AA_DL_monthly_stats",
-        master=SPARK_MASTER,
-    )
-
-    # Lettura
-    df = (
-        spark.read.parquet(HDFS_INPUT)
-        .filter(col("OP_UNIQUE_CARRIER").isin("AA", "DL"))
-    )
-
-    ### Calcolo Q1
-
-    # Calcolo tempo iniziale
-    t0 = time.time()
-
-    result = (
+def build_result(df):
+    return (
         df.groupBy("OP_UNIQUE_CARRIER", "YEAR", "MONTH")
         .agg(
             count("*").alias("total_flights"),
             spark_sum(col("CANCELLED").cast("long")).alias("cancelled_flights"),
             spark_round(
-                spark_sum("CANCELLED") / count("*") * 100, 4
+                spark_sum(col("CANCELLED")) / count("*") * 100, 4
             ).alias("cancellation_rate_pct"),
             spark_round(
                 avg(when(col("CANCELLED") == 0, col("DEP_DELAY"))), 4
@@ -63,26 +47,41 @@ def main():
         .orderBy("OP_UNIQUE_CARRIER", "YEAR", "MONTH")
     )
 
-    # Caching
-    result.cache()
 
-    # Esecuzione
+def run(spark, benchmark=False):
+    df = (
+        spark.read.parquet(HDFS_INPUT)
+        .filter(col("OP_UNIQUE_CARRIER").isin("AA", "DL"))
+    )
+
+    t0 = time.time()
+
+    result = build_result(df)
+
     rows = result.collect()
 
-    # Calcolo tempo trascorso
     elapsed = time.time() - t0
 
-    # Output a schermo
+    if benchmark:
+        return elapsed
+
     show_dataframe_result(result, "Q1", elapsed, 20)
-
-    # Salvataggio CSV locale (directory montata → visibile sull'host)
     save_csv_local(LOCAL_OUT, result, rows)
-
-    # Salvataggio su HDFS
     save_dataframe_hdfs(result, HDFS_OUTPUT)
 
     print(f"\nTempo Q1 (DataFrame API): {elapsed:.2f}s")
-    print(f"{'='*70}\n")
+    print(f"{'=' * 70}\n")
+
+    return elapsed
+
+
+def main():
+    spark = build_spark_session(
+        app_name="Q1_AA_DL_monthly_stats",
+        master=SPARK_MASTER,
+    )
+
+    run(spark, benchmark=False)
 
     spark.stop()
 

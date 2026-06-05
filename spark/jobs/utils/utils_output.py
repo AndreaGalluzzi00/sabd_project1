@@ -108,3 +108,22 @@ def save_rdd_csv_hdfs(sc, path, header, data_rdd, row_mapper=None, coalesce_one=
 # Il tempo di salvataggio HDFS misura esclusivamente la durata della action
 # saveAsTextFile; la cancellazione dell'output precedente non viene inclusa
 # nella metrica di scrittura.
+
+def save_benchmark_csv_local(path, rows, fieldnames):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+
+    with open(path, "w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(rows)
+
+    print(f"CSV benchmark locale: {path}")
+
+
+def save_benchmark_hdfs(spark, rows, hdfs_output):
+    if not rows:
+        print(f"Nessun dato benchmark da salvare su HDFS: {hdfs_output}")
+        return
+
+    df = spark.createDataFrame(rows)
+    save_dataframe_hdfs(df, hdfs_output)

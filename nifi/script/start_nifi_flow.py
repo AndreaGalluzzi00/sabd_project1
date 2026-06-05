@@ -1,8 +1,11 @@
 import os
-import json
 import time
 import uuid
 import requests
+import urllib3
+
+
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 NIFI_BASE_URL = os.getenv("NIFI_BASE_URL", "https://localhost:8443/nifi-api")
 
@@ -195,7 +198,6 @@ def main():
         # Attendi che NiFi registri i controller services
         time.sleep(3)
 
-    # Abilita i controller services nel process group figlio (dove sono definiti)
     enable_controller_services(session, pg_id)
 
     # Attendi che i services siano effettivamente abilitati
