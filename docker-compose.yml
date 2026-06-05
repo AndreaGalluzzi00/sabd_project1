@@ -90,26 +90,6 @@ services:
       - spark-master
     networks: [ sabd-net ]
 
-  spark-worker2:
-    image: sabd-spark:${SPARK_IMAGE_VERSION}
-    pull_policy: never
-    platform: ${PLATFORM}
-    container_name: spark-worker2
-    hostname: spark-worker2
-    restart: unless-stopped
-    profiles: [ "spark-2-workers" ]
-    command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
-    volumes:
-      - ./spark/jobs:/opt/spark/jobs
-      - ./results:/opt/results
-      - ./nifi/config:/opt/hadoop/conf
-    environment:
-      - HADOOP_CONF_DIR=/opt/hadoop/conf
-      - SPARK_WORKER_MEMORY=1536m
-      - SPARK_WORKER_CORES=2
-    depends_on:
-      - spark-master
-    networks: [ sabd-net ]
 
   nifi:
     image: apache/nifi:${NIFI_IMAGE_VERSION}

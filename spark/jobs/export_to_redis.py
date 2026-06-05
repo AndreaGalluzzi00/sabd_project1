@@ -141,6 +141,15 @@ def export_grafana_viz(r: redis.Redis, q1_rows: list[dict], q2_rows: list[dict],
                        q3_pct_rows: list[dict]) -> None:
 
     # Q2
+    if q1_rows:
+        for row in sorted(q1_rows, key=lambda x: int(x["MONTH"])):
+            carrier = row["OP_UNIQUE_CARRIER"]
+            month = MONTH_LABELS.get(row["MONTH"], row["MONTH"])
+            r.hset(f"q1:viz:{carrier}:avg_dep_delay", month, row["avg_dep_delay"])
+            r.hset(f"q1:viz:{carrier}:cancellation_rate", month, row["cancellation_rate_pct"])
+        print("  Q1 viz: q1:viz:{carrier}:avg_dep_delay  |  q1:viz:{carrier}:cancellation_rate")
+
+        # Q2
     components = [
         "avg_carrier_delay", "avg_weather_delay", "avg_nas_delay",
         "avg_security_delay", "avg_late_aircraft_delay",
@@ -157,7 +166,7 @@ def export_grafana_viz(r: redis.Redis, q1_rows: list[dict], q2_rows: list[dict],
     if q3_pct_rows:
         for row in q3_pct_rows:
             carrier = row["OP_UNIQUE_CARRIER"]
-            hour    = f"{int(row['hour']):02d}"           # "00".."23" → ordine lessicografico corretto
+            hour    = f"{int(row['hour']):02d}"
             for pct in ["p25", "p50", "p75", "p90"]:
                 r.hset(f"q3:viz:{carrier}:{pct}", hour, row[pct])
         print("  Q3 viz: q3:viz:{carrier}:{p25|p50|p75|p90}  (field = ora 00–23)")
@@ -167,37 +176,6 @@ CLUSTERING_VIZ_METRICS = [
     "avg_carrier_delay", "avg_late_aircraft",
 ]
 
-
-def export_clustering(r: redis.Redis, rows: list[dict]) -> int:
-    if not rows:
-        return 0
-
-    assignments: dict[str, str] = {}
-    viz: dict[str, dict[str, str]] = {m: {} for m in CLUSTERING_VIZ_METRICS}
-
-    for row in rows:
-        carrier    = row["OP_UNIQUE_CARRIER"]
-        cluster_id = row["prediction"]
-        assignments[carrier] = cluster_id
-
-        r.hset(f"clustering:carrier:{carrier}", mapping={
-            k: row[k] for k in row if k != "OP_UNIQUE_CARRIER"
-        })
-
-        for metric in CLUSTERING_VIZ_METRICS:
-            viz[metric][carrier] = row[metric]
-
-    r.delete("clustering:assignments")
-    r.hset("clustering:assignments", mapping=assignments)
-
-    for metric, mapping in viz.items():
-        r.delete(f"clustering:viz:{metric}")
-        r.hset(f"clustering:viz:{metric}", mapping=mapping)
-
-    k = max(int(v) for v in assignments.values()) + 1
-    r.hset("clustering:meta", mapping={"k": k, "n_carriers": len(rows)})
-
-    return len(rows)
 
 
 # Main
@@ -225,9 +203,7 @@ def main():
         print("\n── Grafana viz keys ")
         export_grafana_viz(r, q1_rows, q2_rows, q3_pct_rows)
 
-        n = export_clustering(r, clust_rows)
-        if n:
-            print(f"Clustering: {n} carrier keys written  (clustering:carrier:{{carrier}} + viz)")
+
 
         # Spot-check: print a few keys
         print("\n── Spot-check ")
