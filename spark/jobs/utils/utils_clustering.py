@@ -48,6 +48,7 @@ def feature_expressions():
         "diverted_rate": spark_round(
             spark_sum("DIVERTED") / count("*") * 100, 4),
 
+
     }
 
 
@@ -402,6 +403,64 @@ def export_cluster_profile_csv(cluster_ids,sizes,feature_cols,cluster_means,delt
             w.writerow(row)
 
     print(f"Profiling tabella delta: {out_csv}")
+def print_cluster_profile_delta(cluster_ids, sizes, feature_cols, delta):
+    """
+    Stampa a console il delta dei centroidi rispetto alla media globale.
+    """
+    print("\nDelta dei centroidi rispetto alla media globale (unità originali):")
+    print("  cluster | n  | " + " | ".join(f"{c[:10]:>10s}" for c in feature_cols))
+
+    for i, cid in enumerate(cluster_ids):
+        print(
+            f"  {cid:7d} | {sizes[i]:2d} | "
+            + " | ".join(
+                f"{delta[i, j]:>+10.2f}"
+                for j in range(len(feature_cols))
+            )
+        )
+
+def profile_clusters(features_df, df_result, feature_cols, out_png, out_csv):
+
+    global_mean, global_std = compute_global_feature_stats(
+        features_df,
+        feature_cols
+    )
+
+    cluster_ids, sizes, cluster_means = compute_cluster_feature_means(
+        df_result,
+        feature_cols
+    )
+
+    delta, zscore = compute_profile_matrices(
+        cluster_means,
+        global_mean,
+        global_std
+    )
+
+    plot_cluster_profile_heatmap(
+        cluster_ids,
+        sizes,
+        feature_cols,
+        zscore,
+        out_png
+    )
+
+    export_cluster_profile_csv(
+        cluster_ids,
+        sizes,
+        feature_cols,
+        cluster_means,
+        delta,
+        zscore,
+        out_csv
+    )
+
+    print_cluster_profile_delta(
+        cluster_ids,
+        sizes,
+        feature_cols,
+        delta
+    )
 
 def build_feature_matrix(features_df, feature_cols):
 

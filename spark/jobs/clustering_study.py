@@ -117,7 +117,7 @@ def run_study(df, study):
     uc.pca_scatter_plot(df_scaled,df_result,best_k,study["out_png_pca"],label=f"{name} ({len(feature_cols)} feature)")
 
     # 6. Profiling cluster
-    uc.profile_clusters(features_df,df_result,feature_cols,best_k,study["out_png_profile"],study["out_profile_csv"])
+    uc.profile_clusters(features_df,df_result,feature_cols,study["out_png_profile"],study["out_profile_csv"])
 
     # 8. Stampa risultati
     uc.print_results(df_result,feature_cols,best_k,elapsed,label=label)

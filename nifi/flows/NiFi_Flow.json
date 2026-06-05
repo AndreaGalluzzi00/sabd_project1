@@ -14,13 +14,13 @@
       {
         "identifier": "d6ebb666-88c2-31db-8d66-ae809b1b7a7f",
         "instanceIdentifier": "3ae4e854-019e-1000-3426-1fe08cf3d0e0",
-        "name": "MergeRecord",
+        "name": "PartitionRecord",
         "comments": "",
         "position": {
           "x": 56.0,
           "y": 208.0
         },
-        "type": "org.apache.nifi.processors.standard.MergeRecord",
+        "type": "org.apache.nifi.processors.standard.PartitionRecord",
         "bundle": {
           "group": "org.apache.nifi",
           "artifact": "nifi-standard-nar",
@@ -29,10 +29,7 @@
         "properties": {
           "record-writer": "2f456180-ca4c-3a4c-85b7-58a6f4ae5c95",
           "record-reader": "ecd5405d-6b24-3e00-9f44-d9516f2c4277",
-          "merge-strategy": "Bin-Packing Algorithm",
-          "min-records": "1000000000",
-          "max-records": "1000000000",
-          "max-bin-age": "30 sec"
+          "OP_UNIQUE_CARRIER": "/OP_UNIQUE_CARRIER"
         },
         "propertyDescriptors": {
           "record-writer": {
@@ -47,29 +44,12 @@
             "identifiesControllerService": true,
             "sensitive": false
           },
-          "merge-strategy": {
-            "name": "merge-strategy",
-            "displayName": "Merge Strategy",
+          "OP_UNIQUE_CARRIER": {
+            "name": "OP_UNIQUE_CARRIER",
+            "displayName": "OP_UNIQUE_CARRIER",
             "identifiesControllerService": false,
-            "sensitive": false
-          },
-          "min-records": {
-            "name": "min-records",
-            "displayName": "Minimum Number of Records",
-            "identifiesControllerService": false,
-            "sensitive": false
-          },
-          "max-records": {
-            "name": "max-records",
-            "displayName": "Maximum Number of Records",
-            "identifiesControllerService": false,
-            "sensitive": false
-          },
-          "max-bin-age": {
-            "name": "max-bin-age",
-            "displayName": "Max Bin Age",
-            "identifiesControllerService": false,
-            "sensitive": false
+            "sensitive": false,
+            "dynamic": true
           }
         },
         "style": {
@@ -127,7 +107,7 @@
           "kerberos-user-service": null,
           "writing-strategy": "writeAndRename",
           "Kerberos Relogin Period": "4 hours",
-          "Directory": "/sabd/processed/",
+          "Directory": "/sabd/processed/OP_UNIQUE_CARRIER=${OP_UNIQUE_CARRIER}/",
           "Conflict Resolution Strategy": "replace"
         },
         "propertyDescriptors": {
@@ -485,7 +465,7 @@
       {
         "identifier": "e1e2e3e4-0003-0003-0003-000000000003",
         "instanceIdentifier": "f1f2f3f4-0003-0003-0003-000000000003",
-        "name": "UpdateAttribute",
+        "name": "UpdateAttribute_filename",
         "comments": "",
         "position": {
           "x": 360.0,
@@ -498,7 +478,7 @@
           "version": "1.25.0"
         },
         "properties": {
-          "filename": "ontime_202501_202504.parquet"
+          "filename": "${filename:substringBeforeLast('.')}_${OP_UNIQUE_CARRIER}.parquet"
         },
         "propertyDescriptors": {
           "filename": {
@@ -576,7 +556,7 @@
           "id": "d6ebb666-88c2-31db-8d66-ae809b1b7a7f",
           "type": "PROCESSOR",
           "groupId": "8311ddf1-5082-3d8d-983a-35bfdca4fd27",
-          "name": "MergeRecord",
+          "name": "PartitionRecord",
           "comments": "",
           "instanceIdentifier": "3ae4e854-019e-1000-3426-1fe08cf3d0e0"
         },
@@ -591,7 +571,7 @@
         "labelIndex": 1,
         "zIndex": 0,
         "selectedRelationships": [
-          "merged"
+          "success"
         ],
         "backPressureObjectThreshold": 10000,
         "backPressureDataSizeThreshold": "1 GB",
@@ -656,7 +636,7 @@
           "id": "d6ebb666-88c2-31db-8d66-ae809b1b7a7f",
           "type": "PROCESSOR",
           "groupId": "8311ddf1-5082-3d8d-983a-35bfdca4fd27",
-          "name": "MergeRecord",
+          "name": "PartitionRecord",
           "comments": "",
           "instanceIdentifier": "3ae4e854-019e-1000-3426-1fe08cf3d0e0"
         },
@@ -1109,7 +1089,7 @@
       {
         "identifier": "2f456180-ca4c-3a4c-85b7-58a6f4ae5c95",
         "instanceIdentifier": "3ae1ce39-019e-1000-1f35-4d24cde44437",
-        "name": "ParquetRecordSetWriter",
+        "name": "ParquetRecordSetWriter_no_carrier",
         "comments": "",
         "type": "org.apache.nifi.parquet.ParquetRecordSetWriter",
         "bundle": {
@@ -1134,10 +1114,10 @@
           "enable-validation": null,
           "dictionary-page-size": null,
           "int96-fields": null,
-          "schema-access-strategy": "inherit-record-schema",
+          "schema-access-strategy": "schema-text-property",
           "schema-protocol-version": "1",
           "schema-version": null,
-          "schema-text": "${avro.schema}",
+          "schema-text": "{\"type\":\"record\",\"name\":\"Flight\",\"namespace\":\"sabd\",\"fields\":[{\"name\":\"YEAR\",\"type\":[\"null\",\"int\"],\"default\":null},{\"name\":\"MONTH\",\"type\":[\"null\",\"int\"],\"default\":null},{\"name\":\"DAY_OF_MONTH\",\"type\":[\"null\",\"int\"],\"default\":null},{\"name\":\"CRS_DEP_TIME\",\"type\":[\"null\",\"int\"],\"default\":null},{\"name\":\"DEP_DELAY\",\"type\":[\"null\",\"double\"],\"default\":null},{\"name\":\"ARR_DELAY\",\"type\":[\"null\",\"double\"],\"default\":null},{\"name\":\"CANCELLED\",\"type\":[\"null\",\"double\"],\"default\":null},{\"name\":\"DIVERTED\",\"type\":[\"null\",\"double\"],\"default\":null},{\"name\":\"CARRIER_DELAY\",\"type\":[\"null\",\"double\"],\"default\":null},{\"name\":\"WEATHER_DELAY\",\"type\":[\"null\",\"double\"],\"default\":null},{\"name\":\"NAS_DELAY\",\"type\":[\"null\",\"double\"],\"default\":null},{\"name\":\"SECURITY_DELAY\",\"type\":[\"null\",\"double\"],\"default\":null},{\"name\":\"LATE_AIRCRAFT_DELAY\",\"type\":[\"null\",\"double\"],\"default\":null}]}",
           "avro-add-list-element-records": "true"
         },
         "propertyDescriptors": {
