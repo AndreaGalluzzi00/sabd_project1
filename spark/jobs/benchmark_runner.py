@@ -148,8 +148,6 @@ def main():
         master=os.getenv("SPARK_MASTER", "spark://spark-master:7077"),
     )
 
-    all_rows = []
-
     for query, api in configs:
         rows = run_benchmark(
             query=query,
@@ -157,44 +155,46 @@ def main():
             runs=args.runs,
             spark=spark,
         )
-        all_rows.extend(rows)
 
-    summary_rows = build_summary(all_rows)
+        summary_rows = build_summary(rows)
+        label = f"{query}_{api}"
 
-    runs_path = os.path.join(RESULTS_DIR, "benchmark_runs.csv")
-    summary_path = os.path.join(RESULTS_DIR, "benchmark_summary.csv")
+        runs_path    = os.path.join(RESULTS_DIR, f"benchmark_runs_{label}.csv")
+        summary_path = os.path.join(RESULTS_DIR, f"benchmark_summary_{label}.csv")
 
-    save_benchmark_csv_local(
-        runs_path,
-        all_rows,
-        ["query", "api", "run", "compute_time"],
-    )
+        save_benchmark_csv_local(
+            runs_path,
+            rows,
+            ["query", "api", "run", "compute_time"],
+        )
 
-    save_benchmark_csv_local(
-        summary_path,
-        summary_rows,
-        ["query", "api", "min", "max", "avg", "median", "variance"],
-    )
+        save_benchmark_csv_local(
+            summary_path,
+            summary_rows,
+            ["query", "api", "min", "max", "avg", "median", "variance"],
+        )
 
-    save_benchmark_hdfs(
-        spark,
-        all_rows,
-        f"{HDFS_RESULTS_DIR}/benchmark_runs",
-    )
+        save_benchmark_hdfs(
+            spark,
+            rows,
+            f"{HDFS_RESULTS_DIR}/benchmark_runs_{label}",
+        )
 
-    save_benchmark_hdfs(
-        spark,
-        summary_rows,
-        f"{HDFS_RESULTS_DIR}/benchmark_summary",
-    )
+        save_benchmark_hdfs(
+            spark,
+            summary_rows,
+            f"{HDFS_RESULTS_DIR}/benchmark_summary_{label}",
+        )
+
+        print(f"Run salvate in: {runs_path}")
+        print(f"Summary salvato in: {summary_path}")
 
     spark.stop()
 
     print("\n" + "=" * 70)
     print("Benchmark completato.")
-    print(f"Run salvate localmente in: {runs_path}")
-    print(f"Summary salvato localmente in: {summary_path}")
-    print(f"Benchmark salvati su HDFS in: {HDFS_RESULTS_DIR}")
+    print(f"Risultati locali in: {RESULTS_DIR}")
+    print(f"Risultati HDFS in: {HDFS_RESULTS_DIR}")
     print("=" * 70)
 
 

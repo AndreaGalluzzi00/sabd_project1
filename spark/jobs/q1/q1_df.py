@@ -54,12 +54,10 @@ def run(spark, benchmark=False):
         .filter(col("OP_UNIQUE_CARRIER").isin("AA", "DL"))
     )
 
-    t0 = time.time()
-
     result = build_result(df)
 
+    t0 = time.time()
     rows = result.collect()
-
     elapsed = time.time() - t0
 
     if benchmark:

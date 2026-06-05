@@ -33,9 +33,6 @@ def run(spark, benchmark=False):
         #crea una nuova colonna con alias hour
     )
 
-    # Calcolo Percentili
-    t0 = time.time()
-
     #calcolo percentili sempre tramite percentile_approx, efficiente
     percentiles = (
         df.groupBy("OP_UNIQUE_CARRIER", "hour")
@@ -63,6 +60,7 @@ def run(spark, benchmark=False):
         percentiles.cache()
         delay_range.cache()
 
+    t0 = time.time()
     percentile_rows = percentiles.collect()
     range_rows = delay_range.collect()
     elapsed = time.time() - t0

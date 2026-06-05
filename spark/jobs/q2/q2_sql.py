@@ -23,9 +23,6 @@ def run(spark, benchmark=False):
     df = spark.read.parquet(HDFS_INPUT)
     df.createOrReplaceTempView("flights")
 
-    # Calcolo Q2 con Spark SQL
-    t0 = time.time()
-
     # per arr_delay possiamo ignorare il valore null poichè presente solo se sono diverted o cancelled
     # per le componenti di ritardo conteggiamo nella media anche i null (settati a 0)
 
@@ -52,6 +49,7 @@ def run(spark, benchmark=False):
     if not benchmark:
         result.cache()
 
+    t0 = time.time()
     rows = result.collect()
     elapsed = time.time() - t0
 

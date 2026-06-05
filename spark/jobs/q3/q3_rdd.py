@@ -72,8 +72,6 @@ def run(spark, benchmark=False):
         .dropna(subset=["DEP_DELAY"])
     )
 
-    t0 = time.time()
-
     # Base RDD (carrier, hour, delay) riusato per percentili e min/max.
     base = df.rdd.map(lambda r: (r["OP_UNIQUE_CARRIER"], int(r["hour"]), float(r["DEP_DELAY"])))
 
@@ -104,6 +102,7 @@ def run(spark, benchmark=False):
         percentile_rdd.cache()
         range_rdd.cache()
 
+    t0 = time.time()
     percentile_rows = percentile_rdd.collect()
     range_rows = [(c, mn, mx) for c, (mn, mx) in range_rdd.collect()]
     elapsed = time.time() - t0

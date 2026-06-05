@@ -33,9 +33,6 @@ def run(spark, benchmark=False):
         .filter((col("CANCELLED") == 0) & (col("DIVERTED") == 0))
     )
 
-    # Calcolo Q2
-    t0 = time.time()
-
     #  Calcoliamo il numero di voli, il ritardo medio all'arrivo e i ritardi medi per ciascuna categoria di ritardo per ogni compagnia aerea
     #  Coalesce converte in valore oppure null in caso null viene sostituito con literal 0.0, in modo da non influenzare la media con valori nulli
     result = (
@@ -68,6 +65,7 @@ def run(spark, benchmark=False):
         #cachato per evitare di ripetere il calcolo più volte durante la fase di output e salvataggio
         result.cache()
 
+    t0 = time.time()
     rows = result.collect()
     elapsed = time.time() - t0
 

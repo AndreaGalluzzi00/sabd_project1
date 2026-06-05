@@ -29,9 +29,6 @@ def run(spark, benchmark=False):
 
     ### Calcolo Q1 con Spark SQL
 
-    # Calcolo tempo iniziale
-    t0 = time.time()
-
     result = spark.sql("""
         SELECT
             OP_UNIQUE_CARRIER,
@@ -52,10 +49,8 @@ def run(spark, benchmark=False):
     if not benchmark:
         result.cache()
 
-    # Esecuzione
+    t0 = time.time()
     rows = result.collect()
-
-    # Calcolo tempo trascorso
     elapsed = time.time() - t0
 
     if benchmark:

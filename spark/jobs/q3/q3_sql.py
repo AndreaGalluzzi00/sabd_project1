@@ -28,9 +28,6 @@ def run(spark, benchmark=False):
     # registro questo DataFrame come tabella SQL temporanea chiamata flights
     df.createOrReplaceTempView("flights")
 
-    # Calcolo Q3 SQL
-    t0 = time.time()
-
     #NB i NULL in dep_delay vengono ignorati per natura di spark e la divisione per 100 serve a rimappare sulle fasce orarie
     percentiles = spark.sql("""
         SELECT
@@ -77,9 +74,9 @@ def run(spark, benchmark=False):
         percentiles.cache()
         delay_range.cache()
 
+    t0 = time.time()
     percentile_rows = percentiles.collect()
     range_rows = delay_range.collect()
-
     elapsed = time.time() - t0
 
     if benchmark:
