@@ -31,6 +31,21 @@ services:
     depends_on:
       - namenode
     networks: [sabd-net]
+  datanode2:
+    image: bde2020/hadoop-datanode:${HADOOP_IMAGE_VERSION}
+    platform: ${PLATFORM}
+    container_name: datanode2
+    hostname: datanode2
+    restart: unless-stopped
+    volumes:
+      - hdfs_datanode2:/hadoop/dfs/data
+    environment:
+      - SERVICE_PRECONDITION=namenode:9870
+    env_file:
+      - ./hadoop.env
+    depends_on:
+      - namenode
+    networks: [sabd-net]
 
   spark-master:
     build: ./spark
@@ -42,9 +57,9 @@ services:
     command: /opt/spark/bin/spark-class org.apache.spark.deploy.master.Master
     working_dir: /opt/spark/jobs
     ports:
-      - "8080:8080"   # Web UI Spark Master
-      - "7077:7077"
-      - "4040:4040"# RPC Spark Master
+    - "8080:8080"   # Web UI Spark Master
+    - "7077:7077"
+    - "4040:4040"   # Spark UI
     volumes:
       - ./spark/jobs:/opt/spark/jobs
       - ./results:/opt/results
@@ -73,7 +88,28 @@ services:
       - SPARK_WORKER_CORES=2
     depends_on:
       - spark-master
-    networks: [sabd-net]
+    networks: [ sabd-net ]
+
+  spark-worker2:
+    image: sabd-spark:${SPARK_IMAGE_VERSION}
+    pull_policy: never
+    platform: ${PLATFORM}
+    container_name: spark-worker2
+    hostname: spark-worker2
+    restart: unless-stopped
+    profiles: [ "spark-2-workers" ]
+    command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
+    volumes:
+      - ./spark/jobs:/opt/spark/jobs
+      - ./results:/opt/results
+      - ./nifi/config:/opt/hadoop/conf
+    environment:
+      - HADOOP_CONF_DIR=/opt/hadoop/conf
+      - SPARK_WORKER_MEMORY=1536m
+      - SPARK_WORKER_CORES=2
+    depends_on:
+      - spark-master
+    networks: [ sabd-net ]
 
   nifi:
     image: apache/nifi:${NIFI_IMAGE_VERSION}
@@ -132,4 +168,5 @@ networks:
 volumes:
   hdfs_namenode:
   hdfs_datanode:
+  hdfs_datanode2:
   grafana_data:
