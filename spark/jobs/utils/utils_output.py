@@ -75,15 +75,6 @@ def save_rdd_csv_local(path, header, rows):
 
 
 def save_rdd_csv_hdfs(sc, path, header, data_rdd, row_mapper=None, coalesce_one=True):
-    """
-    Salva un RDD su HDFS in formato CSV usando saveAsTextFile.
-
-    Stampa:
-      - path HDFS di output
-      - tempo della sola action saveAsTextFile.
-    """
-
-    # saveAsTextFile non sovrascrive: elimino prima la directory se esiste.
     hadoop_conf = sc._jsc.hadoopConfiguration()
     fs = sc._jvm.org.apache.hadoop.fs.FileSystem.get(hadoop_conf)
     out_path = sc._jvm.org.apache.hadoop.fs.Path(path)
@@ -107,7 +98,6 @@ def save_rdd_csv_hdfs(sc, path, header, data_rdd, row_mapper=None, coalesce_one=
     if coalesce_one:
         output_rdd = output_rdd.coalesce(1)
 
-    # Misuro SOLO la action di scrittura.
     t_write = time.time()
     output_rdd.saveAsTextFile(path)
     write_elapsed = time.time() - t_write

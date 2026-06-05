@@ -254,70 +254,154 @@ def pca_scatter_plot(df_scaled, df_result, best_k, out_png_pca, label=""):
     print(f"PCA scatter plot: {out_png_pca}")
 
 
-# Profiling dei cluster: heatmap z-score + tabella delta
-def profile_clusters(features_df, df_result, feature_cols, best_k, out_png, out_csv):
+def compute_global_feature_stats(features_df, feature_cols):
+    """
+    Calcola media globale e deviazione standard globale delle feature
+    sui carrier selezionati.
+    """
     g = features_df.select(
         *[spark_mean(c).alias(f"{c}__mean") for c in feature_cols],
         *[stddev(c).alias(f"{c}__std") for c in feature_cols],
     ).collect()[0]
-    global_mean = np.array([g[f"{c}__mean"] for c in feature_cols], dtype=float)
-    global_std  = np.array([g[f"{c}__std"]  for c in feature_cols], dtype=float)
-    global_std  = np.where((global_std == 0) | np.isnan(global_std), 1.0, global_std)
 
+    global_mean = np.array(
+        [g[f"{c}__mean"] for c in feature_cols],
+        dtype=float
+    )
+
+    global_std = np.array(
+        [g[f"{c}__std"] for c in feature_cols],
+        dtype=float
+    )
+
+    # Evita divisioni per zero o NaN nel calcolo dello z-score
+    global_std = np.where(
+        (global_std == 0) | np.isnan(global_std),
+        1.0,
+        global_std
+    )
+
+    return global_mean, global_std
+
+def compute_cluster_feature_means(df_result, feature_cols):
+    """
+    Calcola, per ogni cluster, il numero di carrier e la media delle feature.
+    """
     rows = (
         df_result.groupBy("prediction")
-        .agg(count("*").alias("n_carriers"), *[spark_mean(c).alias(c) for c in feature_cols])
+        .agg(
+            count("*").alias("n_carriers"),
+            *[spark_mean(c).alias(c) for c in feature_cols]
+        )
         .orderBy("prediction")
         .collect()
     )
-    cluster_ids = [r["prediction"] for r in rows]
-    sizes       = [r["n_carriers"] for r in rows]
-    means       = np.array([[r[c] for c in feature_cols] for r in rows], dtype=float)  # (k, n_feat)
 
-    delta  = means - global_mean
+    cluster_ids = [r["prediction"] for r in rows]
+    sizes = [r["n_carriers"] for r in rows]
+
+    cluster_means = np.array(
+        [[r[c] for c in feature_cols] for r in rows],
+        dtype=float
+    )
+
+    return cluster_ids, sizes, cluster_means
+
+def compute_profile_matrices(cluster_means, global_mean, global_std):
+    """
+    Calcola delta e z-score dei cluster rispetto alla media globale.
+    """
+    delta = cluster_means - global_mean
     zscore = delta / global_std
 
-    # --- heatmap z-score ---
-    fig, ax = plt.subplots(figsize=(max(8, len(feature_cols) * 0.95),
-                                    max(3.5, len(cluster_ids) * 0.8) + 1.5))
+    return delta, zscore
+
+def plot_cluster_profile_heatmap(cluster_ids, sizes, feature_cols, zscore, out_png):
+
+    fig, ax = plt.subplots(
+        figsize=(
+            max(8, len(feature_cols) * 0.95),
+            max(3.5, len(cluster_ids) * 0.8) + 1.5
+        )
+    )
+
     vmax = float(np.nanmax(np.abs(zscore))) or 1.0
-    im = ax.imshow(zscore, cmap="RdBu_r", vmin=-vmax, vmax=vmax, aspect="auto")
+
+    im = ax.imshow(
+        zscore,
+        cmap="RdBu_r",
+        vmin=-vmax,
+        vmax=vmax,
+        aspect="auto"
+    )
+
     ax.set_xticks(range(len(feature_cols)))
-    ax.set_xticklabels(feature_cols, rotation=45, ha="right", fontsize=8)
+    ax.set_xticklabels(
+        feature_cols,
+        rotation=45,
+        ha="right",
+        fontsize=8
+    )
+
     ax.set_yticks(range(len(cluster_ids)))
-    ax.set_yticklabels([f"Cluster {c} (n={n})" for c, n in zip(cluster_ids, sizes)], fontsize=9)
+    ax.set_yticklabels(
+        [f"Cluster {c} (n={n})" for c, n in zip(cluster_ids, sizes)],
+        fontsize=9
+    )
+
     for i in range(len(cluster_ids)):
         for j in range(len(feature_cols)):
-            ax.text(j, i, f"{zscore[i, j]:+.2f}", ha="center", va="center", fontsize=7)
-    fig.colorbar(im, ax=ax, label="z-score (scarto dalla media globale, in σ)")
+            ax.text(
+                j,
+                i,
+                f"{zscore[i, j]:+.2f}",
+                ha="center",
+                va="center",
+                fontsize=7
+            )
+
+    fig.colorbar(
+        im,
+        ax=ax,
+        label="z-score (scarto dalla media globale, in σ)"
+    )
+
     ax.set_title("Profiling cluster — centroidi in z-score per feature")
+
     plt.tight_layout()
     plt.savefig(out_png, dpi=150, bbox_inches="tight")
     plt.close()
+
     print(f"Profiling heatmap: {out_png}")
 
-    # --- tabella delta (CSV) ---
+
+
+def export_cluster_profile_csv(cluster_ids,sizes,feature_cols,cluster_means,delta,zscore,out_csv):
     with open(out_csv, "w", newline="") as f:
+
         w = csv.writer(f)
         header = ["prediction", "n_carriers"]
         for c in feature_cols:
-            header += [f"{c}_mean", f"{c}_delta", f"{c}_zscore"]
+            header += [
+                f"{c}_mean",
+                f"{c}_delta",
+                f"{c}_zscore"
+            ]
         w.writerow(header)
+
         for i, cid in enumerate(cluster_ids):
             row = [cid, sizes[i]]
+
             for j, c in enumerate(feature_cols):
-                row += [round(float(means[i, j]), 4), round(float(delta[i, j]), 4), round(float(zscore[i, j]), 4)]
+                row += [
+                    round(float(cluster_means[i, j]), 4),
+                    round(float(delta[i, j]), 4),
+                    round(float(zscore[i, j]), 4),
+                ]
+
             w.writerow(row)
+
     print(f"Profiling tabella delta: {out_csv}")
-
-    print("\nDelta dei centroidi rispetto alla media globale (unità originali):")
-    print("  cluster | n  | " + " | ".join(f"{c[:10]:>10s}" for c in feature_cols))
-    for i, cid in enumerate(cluster_ids):
-        print(f"  {cid:7d} | {sizes[i]:2d} | "
-              + " | ".join(f"{delta[i, j]:>+10.2f}" for j in range(len(feature_cols))))
-
-
-
 
 def build_feature_matrix(features_df, feature_cols):
 
@@ -460,7 +544,7 @@ def export_k_metrics(k_values, wssse_list, silhouette_list, local_csv):
     print(f"Metriche k (WSSSE/Silhouette): {local_csv}")
 
 
-# Stampa + export risultati
+
 def print_results(df_result, feature_cols, best_k, elapsed, label):
     print(f"\n{'='*70}")
     print(f"CLUSTERING [{label}] — RISULTATI  (k={best_k}, tempo: {elapsed:.2f}s)")
