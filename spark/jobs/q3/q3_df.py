@@ -55,10 +55,9 @@ def run(spark, benchmark=False):
         .orderBy("OP_UNIQUE_CARRIER")
     )
 
-    if not benchmark:
-        #caching per evitarne il ricalcolo
-        percentiles.cache()
-        delay_range.cache()
+    #caching per evitarne il ricalcolo (attivo anche in benchmark)
+    percentiles.cache()
+    delay_range.cache()
 
     t0 = time.time()
     percentile_rows = percentiles.collect()

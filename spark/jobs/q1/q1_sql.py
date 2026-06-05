@@ -46,8 +46,8 @@ def run(spark, benchmark=False):
         ORDER BY OP_UNIQUE_CARRIER, YEAR, MONTH
     """)
 
-    if not benchmark:
-        result.cache()
+    #caching per evitarne il ricalcolo (attivo anche in benchmark)
+    result.cache()
 
     t0 = time.time()
     rows = result.collect()

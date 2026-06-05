@@ -97,10 +97,10 @@ def run(spark, benchmark=False):
         .mapValues(finalize) # applicazione funzione di finalizzazione senza modificare le chiavi
     )
 
-    if not benchmark:
-        # cache(): chiediamo a Spark di TENERE IN MEMORIA il risultato di questa RDD,
-        # perché lo riutilizzeremo per due azioni consecutive (collect e salvataggio su HDFS).
-        result_rdd.cache()
+    # cache(): chiediamo a Spark di TENERE IN MEMORIA il risultato di questa RDD,
+    # perché lo riutilizzeremo per due azioni consecutive (collect e salvataggio su HDFS).
+    # Attivo anche in benchmark per misurare lo stesso path della produzione.
+    result_rdd.cache()
 
     # Calcolo tempo iniziale
     t0 = time.time()

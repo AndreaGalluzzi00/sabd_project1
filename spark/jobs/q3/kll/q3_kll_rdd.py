@@ -79,6 +79,10 @@ def run(spark, benchmark=False):
         float(row.DEP_DELAY)
     ))
 
+    # cache della sorgente: riusata da percentili e min/max (coerente con q3_rdd);
+    # attiva anche in benchmark per misurare lo stesso path della produzione
+    rdd = rdd.cache()
+
     # Percentili via RDD + KLL sketch
     percentile_rdd = (
         rdd
@@ -105,9 +109,9 @@ def run(spark, benchmark=False):
         .sortBy(lambda x: x[0])
     )
 
-    if not benchmark:
-        percentile_rdd.cache()
-        range_rdd.cache()
+    # Caching dei risultati per evitare ricalcolo durante il salvataggio HDFS
+    percentile_rdd.cache()
+    range_rdd.cache()
 
     t0 = time.time()
     percentile_rows = percentile_rdd.collect()

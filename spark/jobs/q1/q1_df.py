@@ -56,6 +56,9 @@ def run(spark, benchmark=False):
 
     result = build_result(df)
 
+    #caching per evitarne il ricalcolo: riusato da collect + show + write HDFS (attivo anche in benchmark)
+    result.cache()
+
     t0 = time.time()
     rows = result.collect()
     elapsed = time.time() - t0

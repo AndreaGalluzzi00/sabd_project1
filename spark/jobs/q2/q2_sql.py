@@ -46,8 +46,8 @@ def run(spark, benchmark=False):
         LIMIT 10
     """)
 
-    if not benchmark:
-        result.cache()
+    #caching per evitarne il ricalcolo (attivo anche in benchmark)
+    result.cache()
 
     t0 = time.time()
     rows = result.collect()

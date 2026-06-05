@@ -75,9 +75,9 @@ def run(spark, benchmark=False):
     # Base RDD (carrier, hour, delay) riusato per percentili e min/max.
     base = df.rdd.map(lambda r: (r["OP_UNIQUE_CARRIER"], int(r["hour"]), float(r["DEP_DELAY"])))
 
-    if not benchmark:
-        # cache() per evitare di rileggere i dati due volte (percentili + range)
-        base = base.cache()
+    # cache() per evitare di rileggere i dati due volte (percentili + range);
+    # attivo anche in benchmark per misurare lo stesso path della produzione
+    base = base.cache()
 
     # Percentili: groupByKey per (carrier, hour) calcolo esatto sul gruppo ordinato.
     percentile_rdd = (
@@ -97,10 +97,9 @@ def run(spark, benchmark=False):
         .sortByKey() # qui ottieni quindi (carrier, (min,max))
     )
 
-    if not benchmark:
-        # Caching dei risultati per evitare ricalcolo durante il salvataggio HDFS
-        percentile_rdd.cache()
-        range_rdd.cache()
+    # Caching dei risultati per evitare ricalcolo durante il salvataggio HDFS
+    percentile_rdd.cache()
+    range_rdd.cache()
 
     t0 = time.time()
     percentile_rows = percentile_rdd.collect()

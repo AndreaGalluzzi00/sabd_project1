@@ -61,9 +61,8 @@ def run(spark, benchmark=False):
         .limit(10)
     )
 
-    if not benchmark:
-        #cachato per evitare di ripetere il calcolo più volte durante la fase di output e salvataggio
-        result.cache()
+    #cachato per evitare di ripetere il calcolo più volte durante la fase di output e salvataggio (attivo anche in benchmark)
+    result.cache()
 
     t0 = time.time()
     rows = result.collect()
