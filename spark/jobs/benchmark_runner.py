@@ -18,7 +18,10 @@ RESULTS_DIR = "/opt/results"
 HDFS_RESULTS_DIR = "hdfs://namenode:9000/sabd/results"
 
 DEFAULT_RUNS = 20
-
+HDFS_INPUTS = {
+    "monthly": "hdfs://namenode:9000/sabd/processed_monthly/",
+    "single": "hdfs://namenode:9000/sabd/processed_single/",
+}
 
 MODULES = {
     ("q1", "df"): "q1.q1_df",
@@ -37,7 +40,7 @@ MODULES = {
 }
 
 
-def run_spark_job(query, api, spark):
+def run_spark_job(query, api, spark, hdfs_input):
     key = (query, api)
 
     if key not in MODULES:
@@ -47,15 +50,20 @@ def run_spark_job(query, api, spark):
     query_module = importlib.import_module(module_name)
 
     if not hasattr(query_module, "run"):
-        raise AttributeError(f"Il modulo {module_name} non contiene una funzione run(spark, benchmark=True).")
+        raise AttributeError(
+            f"Il modulo {module_name} non contiene una funzione run(spark, benchmark=True)."
+        )
 
-    compute_time = query_module.run(spark, benchmark=True)
+    compute_time = query_module.run(
+    spark,
+    benchmark=True,
+    hdfs_input=hdfs_input,
+    )
 
     if compute_time is None:
         raise RuntimeError(f"La funzione run() di {module_name} non ha restituito un tempo.")
 
     return float(compute_time)
-
 
 def summary_stats(values):
     return {
@@ -72,16 +80,17 @@ def build_summary(run_rows):
     groups = {}
 
     for row in run_rows:
-        key = (row["query"], row["api"])
+        key = (row["query"], row["api"], row["layout"])
         groups.setdefault(key, []).append(row)
 
-    for (query, api), rows in groups.items():
+    for (query, api, layout), rows in groups.items():
         values = [float(r["compute_time"]) for r in rows]
         stats = summary_stats(values)
 
         summary_rows.append({
             "query": query,
             "api": api,
+            "layout": layout,
             "min": stats["min"],
             "max": stats["max"],
             "avg": stats["avg"],
@@ -92,21 +101,23 @@ def build_summary(run_rows):
     return summary_rows
 
 
-def run_benchmark(query, api, runs, spark):
+def run_benchmark(query, api, runs, spark, layout, hdfs_input):
     rows = []
 
     print("\n" + "=" * 70)
-    print(f"Benchmark {query.upper()} - {api.upper()}")
+    print(f"Benchmark {query.upper()} - {api.upper()} - layout={layout}")
     print(f"Modulo: {MODULES[(query, api)]}")
+    print(f"Input HDFS: {hdfs_input}")
     print(f"Run misurate: {runs}")
     print("=" * 70 + "\n")
 
     for run_num in range(1, runs + 1):
-        compute_time = run_spark_job(query, api, spark)
+        compute_time = run_spark_job(query, api, spark, hdfs_input)
 
         row = {
             "query": query,
             "api": api,
+            "layout": layout,
             "run": run_num,
             "compute_time": compute_time,
         }
@@ -117,7 +128,6 @@ def run_benchmark(query, api, runs, spark):
 
     return rows
 
-
 def main():
     parser = argparse.ArgumentParser()
 
@@ -127,13 +137,18 @@ def main():
         choices=["rdd", "df", "sql", "kll_rdd", "tdigest_rdd"],
         required=False,
     )
+    parser.add_argument(
+        "--layout",
+        choices=["monthly", "single"],
+        default="monthly",
+    )
     parser.add_argument("--runs", type=int, default=DEFAULT_RUNS)
     parser.add_argument("--all", action="store_true")
 
     args = parser.parse_args()
 
     Path(RESULTS_DIR).mkdir(parents=True, exist_ok=True)
-
+    hdfs_input = HDFS_INPUTS[args.layout]
     if args.all:
         configs = list(MODULES.keys())
     else:
@@ -156,36 +171,47 @@ def main():
             api=api,
             runs=args.runs,
             spark=spark,
+            layout=args.layout,
+            hdfs_input=hdfs_input,
         )
         all_rows.extend(rows)
 
     summary_rows = build_summary(all_rows)
 
-    runs_path = os.path.join(RESULTS_DIR, "benchmark_runs.csv")
-    summary_path = os.path.join(RESULTS_DIR, "benchmark_summary.csv")
+    suffix = "all" if args.all else f"{args.q}_{args.api}"
+
+    runs_path = os.path.join(
+        RESULTS_DIR,
+        f"benchmark_runs_{suffix}_{args.layout}.csv"
+    )
+
+    summary_path = os.path.join(
+        RESULTS_DIR,
+        f"benchmark_summary_{suffix}_{args.layout}.csv"
+    )
 
     save_benchmark_csv_local(
         runs_path,
         all_rows,
-        ["query", "api", "run", "compute_time"],
+        ["query", "api", "layout", "run", "compute_time"],
     )
 
     save_benchmark_csv_local(
         summary_path,
         summary_rows,
-        ["query", "api", "min", "max", "avg", "median", "variance"],
+        ["query", "api", "layout", "min", "max", "avg", "median", "variance"],
     )
 
     save_benchmark_hdfs(
         spark,
         all_rows,
-        f"{HDFS_RESULTS_DIR}/benchmark_runs",
+        f"{HDFS_RESULTS_DIR}/benchmark_runs/query={suffix}/layout={args.layout}",
     )
 
     save_benchmark_hdfs(
         spark,
         summary_rows,
-        f"{HDFS_RESULTS_DIR}/benchmark_summary",
+        f"{HDFS_RESULTS_DIR}/benchmark_summary/query={suffix}/layout={args.layout}",
     )
 
     spark.stop()

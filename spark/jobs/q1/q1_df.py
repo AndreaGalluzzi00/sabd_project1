@@ -18,7 +18,7 @@ from utils import build_spark_session
 
 
 SPARK_MASTER = os.getenv("SPARK_MASTER", "spark://spark-master:7077")
-HDFS_INPUT   = "hdfs://namenode:9000/sabd/processed/"
+DEFAULT_HDFS_INPUT = "hdfs://namenode:9000/sabd/processed_single/"
 HDFS_OUTPUT  = "hdfs://namenode:9000/sabd/results/q1_df/"
 LOCAL_OUT    = "/opt/results/q1_df.csv"
 
@@ -48,16 +48,21 @@ def build_result(df):
     )
 
 
-def run(spark, benchmark=False):
+def run(spark, benchmark=False, hdfs_input=None):
+    input_path = hdfs_input or os.getenv("HDFS_INPUT", DEFAULT_HDFS_INPUT)
+
     df = (
-        spark.read.parquet(HDFS_INPUT)
+        spark.read.parquet(input_path)
         .filter(col("OP_UNIQUE_CARRIER").isin("AA", "DL"))
     )
 
-    t0 = time.time()
+
 
     result = build_result(df)
 
+    if not benchmark:
+        result.cache()
+    t0 = time.time()
     rows = result.collect()
 
     elapsed = time.time() - t0
@@ -73,7 +78,6 @@ def run(spark, benchmark=False):
     print(f"{'=' * 70}\n")
 
     return elapsed
-
 
 def main():
     spark = build_spark_session(

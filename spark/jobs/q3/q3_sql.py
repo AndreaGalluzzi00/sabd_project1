@@ -12,7 +12,7 @@ from utils import build_spark_session
 
 
 SPARK_MASTER = os.getenv("SPARK_MASTER","spark://spark-master:7077")
-HDFS_INPUT = "hdfs://namenode:9000/sabd/processed/"
+DEFAULT_HDFS_INPUT = "hdfs://namenode:9000/sabd/processed_single/"
 HDFS_OUTPUT_PERCENTILES = "hdfs://namenode:9000/sabd/results/q3_sql/percentiles/"
 HDFS_OUTPUT_RANGE = "hdfs://namenode:9000/sabd/results/q3_sql/delay_range/"
 LOCAL_OUT_PERCENTILES = "/opt/results/q3_percentiles_sql.csv"
@@ -23,8 +23,9 @@ os.makedirs(LOCAL_OUT, exist_ok=True)
 os.makedirs(os.path.dirname(LOCAL_OUT_PERCENTILES), exist_ok=True)
 
 
-def run(spark, benchmark=False):
-    df = spark.read.parquet(HDFS_INPUT)
+def run(spark, benchmark=False, hdfs_input=None):
+    input_path = hdfs_input or os.getenv("HDFS_INPUT", DEFAULT_HDFS_INPUT)
+    df = spark.read.parquet(input_path)
     # registro questo DataFrame come tabella SQL temporanea chiamata flights
     df.createOrReplaceTempView("flights")
 

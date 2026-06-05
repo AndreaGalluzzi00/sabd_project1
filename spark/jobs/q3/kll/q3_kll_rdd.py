@@ -16,7 +16,7 @@ from utils import build_spark_session
 
 
 SPARK_MASTER            = os.getenv("SPARK_MASTER", "spark://spark-master:7077")
-HDFS_INPUT              = "hdfs://namenode:9000/sabd/processed/"
+DEFAULT_HDFS_INPUT = "hdfs://namenode:9000/sabd/processed_single/"
 HDFS_OUTPUT_PERCENTILES = "hdfs://namenode:9000/sabd/results/q3_kll/percentiles/"
 HDFS_OUTPUT_RANGE       = "hdfs://namenode:9000/sabd/results/q3_kll/delay_range/"
 LOCAL_OUT_PERCENTILES   = "/opt/results/q3_percentiles_kll.csv"
@@ -60,11 +60,12 @@ def merge_combiners(b1: bytes, b2: bytes) -> bytes:
     return s1.serialize()
 
 
-def run(spark, benchmark=False):
+def run(spark, benchmark=False, hdfs_input=None):
+    input_path = hdfs_input or os.getenv("HDFS_INPUT", DEFAULT_HDFS_INPUT)
     sc = spark.sparkContext
 
     df = (
-        spark.read.parquet(HDFS_INPUT)
+        spark.read.parquet(input_path)
         .filter(
             (col("OP_UNIQUE_CARRIER").isin("AA", "DL", "UA", "WN")) &
             (col("CANCELLED") == 0)

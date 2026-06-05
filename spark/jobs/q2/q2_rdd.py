@@ -15,7 +15,7 @@ from utils import build_spark_session
 
 
 SPARK_MASTER = os.getenv("SPARK_MASTER", "spark://spark-master:7077")
-HDFS_INPUT   = "hdfs://namenode:9000/sabd/processed/"
+DEFAULT_HDFS_INPUT = "hdfs://namenode:9000/sabd/processed_single/"
 HDFS_OUTPUT  = "hdfs://namenode:9000/sabd/results/q2_rdd/"
 LOCAL_OUT    = "/opt/results/q2_rdd.csv"
 
@@ -102,14 +102,15 @@ def top_key(kv):
     return -avg_arr_delay if avg_arr_delay is not None else float("inf")
 
 
-def run(spark, benchmark=False):
+def run(spark, benchmark=False, hdfs_input=None):
+    input_path = hdfs_input or os.getenv("HDFS_INPUT", DEFAULT_HDFS_INPUT)
     sc = spark.sparkContext
 
     # Pipeline lazy — nessun calcolo finché non scatta l'action
     # Filtro base sul DataFrame per sfruttare predicate pushdown e column pruning
     # del Parquet; poi passaggio all'RDD.
     base_df = (
-        spark.read.parquet(HDFS_INPUT)
+        spark.read.parquet(input_path)
         .filter((col("CANCELLED") == 0) & (col("DIVERTED") == 0))
         .select(
             "OP_UNIQUE_CARRIER",

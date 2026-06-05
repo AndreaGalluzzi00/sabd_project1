@@ -16,7 +16,7 @@ from utils_output import (
 from utils import build_spark_session
 
 SPARK_MASTER            = os.getenv("SPARK_MASTER", "spark://spark-master:7077")
-HDFS_INPUT              = "hdfs://namenode:9000/sabd/processed/"
+DEFAULT_HDFS_INPUT = "hdfs://namenode:9000/sabd/processed_single/"
 HDFS_OUTPUT_PERCENTILES = "hdfs://namenode:9000/sabd/results/q3_rdd/percentiles/"
 HDFS_OUTPUT_RANGE       = "hdfs://namenode:9000/sabd/results/q3_rdd/delay_range/"
 LOCAL_OUT_PERCENTILES   = "/opt/results/q3_percentiles_rdd.csv"
@@ -57,12 +57,13 @@ def quantiles(values_iter):
     )
 
 
-def run(spark, benchmark=False):
+def run(spark, benchmark=False, hdfs_input=None):
+    input_path = hdfs_input or os.getenv("HDFS_INPUT", DEFAULT_HDFS_INPUT)
     sc = spark.sparkContext
 
     #qui esplicitiamo il drop null su dep_delay nelle altre versioni no ma lo fa di default il percentile_approx
     df = (
-        spark.read.parquet(HDFS_INPUT)
+        spark.read.parquet(input_path)
         .filter(
             (col("OP_UNIQUE_CARRIER").isin("AA", "DL", "UA", "WN")) &
             (col("CANCELLED") == 0)

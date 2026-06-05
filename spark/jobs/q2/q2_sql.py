@@ -11,20 +11,21 @@ from utils_output import (
 from utils import build_spark_session
 
 SPARK_MASTER = os.getenv("SPARK_MASTER","spark://spark-master:7077")
-HDFS_INPUT   = "hdfs://namenode:9000/sabd/processed/"
+DEFAULT_HDFS_INPUT = "hdfs://namenode:9000/sabd/processed_single/"
 HDFS_OUTPUT  = "hdfs://namenode:9000/sabd/results/q2_sql/"
 LOCAL_OUT    = "/opt/results/q2_sql.csv"
 
 os.makedirs(os.path.dirname(LOCAL_OUT), exist_ok=True)
 
 
-def run(spark, benchmark=False):
+def run(spark, benchmark=False, hdfs_input=None):
+    input_path = hdfs_input or os.getenv("HDFS_INPUT", DEFAULT_HDFS_INPUT)
     # Lettura e registrazione come vista temporanea
-    df = spark.read.parquet(HDFS_INPUT)
+    df = spark.read.parquet(input_path)
     df.createOrReplaceTempView("flights")
 
     # Calcolo Q2 con Spark SQL
-    t0 = time.time()
+
 
     # per arr_delay possiamo ignorare il valore null poichè presente solo se sono diverted o cancelled
     # per le componenti di ritardo conteggiamo nella media anche i null (settati a 0)
@@ -51,7 +52,7 @@ def run(spark, benchmark=False):
 
     if not benchmark:
         result.cache()
-
+    t0 = time.time()
     rows = result.collect()
     elapsed = time.time() - t0
 

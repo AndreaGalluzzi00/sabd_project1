@@ -12,7 +12,7 @@ from utils_output import (
 from utils import build_spark_session
 
 SPARK_MASTER = os.getenv("SPARK_MASTER", "spark://spark-master:7077")
-HDFS_INPUT   = "hdfs://namenode:9000/sabd/processed/"
+DEFAULT_HDFS_INPUT = "hdfs://namenode:9000/sabd/processed_single/"
 HDFS_OUTPUT  = "hdfs://namenode:9000/sabd/results/q1_rdd/"
 LOCAL_OUT    = "/opt/results/q1_rdd.csv"
 
@@ -81,14 +81,15 @@ def finalize(v):
 
     return total, cancelled, cancellation_rate, avg_delay, min_delay, max_delay
 
-def run(spark, benchmark=False):
+def run(spark, benchmark=False, hdfs_input=None):
+    input_path = hdfs_input or os.getenv("HDFS_INPUT", DEFAULT_HDFS_INPUT)
     sc = spark.sparkContext
 
     ### Calcolo Q1 con RDD ###
 
     # Spark costruisce solo il piano di esecuzione (lineage), trattandosi di Trasformazioni (lazy).
     result_rdd = (
-        spark.read.parquet(HDFS_INPUT)
+        spark.read.parquet(input_path)
         .select("OP_UNIQUE_CARRIER", "YEAR", "MONTH", "CANCELLED", "DEP_DELAY") # Leggiamo solo le 5 colonne utili (column pruning del Parquet)
         .rdd
         .filter(lambda r: r["OP_UNIQUE_CARRIER"] in ("AA", "DL"))  # solo AA/DL

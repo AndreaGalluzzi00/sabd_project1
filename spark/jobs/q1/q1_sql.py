@@ -10,7 +10,7 @@ from utils_output import (
 )
 from utils import build_spark_session
 SPARK_MASTER = os.getenv("SPARK_MASTER","spark://spark-master:7077")
-HDFS_INPUT   = "hdfs://namenode:9000/sabd/processed/"
+DEFAULT_HDFS_INPUT = "hdfs://namenode:9000/sabd/processed_single/"
 HDFS_OUTPUT  = "hdfs://namenode:9000/sabd/results/q1_sql/"
 LOCAL_OUT    = "/opt/results/q1_sql.csv"
 
@@ -19,7 +19,7 @@ os.makedirs(os.path.dirname(LOCAL_OUT), exist_ok=True)
 
 def run(spark, benchmark=False):
     # Lettura e registrazione come vista temporanea
-    df = spark.read.parquet(HDFS_INPUT)
+    df = spark.read.parquet(input_path)
 
     # La vista temporanea "flights" permette di eseguire query SQL su questo DataFrame.
     # Infatti, il motore SQL ragiona in termini di tabelle e viste, non di oggetti Python - come per esempio DataFrame
@@ -30,7 +30,7 @@ def run(spark, benchmark=False):
     ### Calcolo Q1 con Spark SQL
 
     # Calcolo tempo iniziale
-    t0 = time.time()
+
 
     result = spark.sql("""
         SELECT
@@ -51,7 +51,7 @@ def run(spark, benchmark=False):
 
     if not benchmark:
         result.cache()
-
+    t0 = time.time()
     # Esecuzione
     rows = result.collect()
 

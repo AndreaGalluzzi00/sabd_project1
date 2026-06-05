@@ -14,13 +14,13 @@
       {
         "identifier": "d6ebb666-88c2-31db-8d66-ae809b1b7a7f",
         "instanceIdentifier": "3ae4e854-019e-1000-3426-1fe08cf3d0e0",
-        "name": "MergeRecord",
-        "comments": "",
+        "name": "ConvertRecord_monthly",
+        "comments": "Converte ogni CSV mensile in un file Parquet separato.",
         "position": {
           "x": 56.0,
           "y": 208.0
         },
-        "type": "org.apache.nifi.processors.standard.MergeRecord",
+        "type": "org.apache.nifi.processors.standard.ConvertRecord",
         "bundle": {
           "group": "org.apache.nifi",
           "artifact": "nifi-standard-nar",
@@ -29,10 +29,7 @@
         "properties": {
           "record-writer": "2f456180-ca4c-3a4c-85b7-58a6f4ae5c95",
           "record-reader": "ecd5405d-6b24-3e00-9f44-d9516f2c4277",
-          "merge-strategy": "Bin-Packing Algorithm",
-          "min-records": "1000000000",
-          "max-records": "1000000000",
-          "max-bin-age": "30 sec"
+          "include-zero-record-flowfiles": "true"
         },
         "propertyDescriptors": {
           "record-writer": {
@@ -47,27 +44,9 @@
             "identifiesControllerService": true,
             "sensitive": false
           },
-          "merge-strategy": {
-            "name": "merge-strategy",
-            "displayName": "Merge Strategy",
-            "identifiesControllerService": false,
-            "sensitive": false
-          },
-          "min-records": {
-            "name": "min-records",
-            "displayName": "Minimum Number of Records",
-            "identifiesControllerService": false,
-            "sensitive": false
-          },
-          "max-records": {
-            "name": "max-records",
-            "displayName": "Maximum Number of Records",
-            "identifiesControllerService": false,
-            "sensitive": false
-          },
-          "max-bin-age": {
-            "name": "max-bin-age",
-            "displayName": "Max Bin Age",
+          "include-zero-record-flowfiles": {
+            "name": "include-zero-record-flowfiles",
+            "displayName": "Include Zero Record FlowFiles",
             "identifiesControllerService": false,
             "sensitive": false
           }
@@ -84,7 +63,6 @@
         "runDurationMillis": 0,
         "concurrentlySchedulableTaskCount": 1,
         "autoTerminatedRelationships": [
-          "original",
           "failure"
         ],
         "scheduledState": "ENABLED",
@@ -98,11 +76,11 @@
       {
         "identifier": "ff1b3ec3-758e-3773-8175-4df6a0e5a059",
         "instanceIdentifier": "3b77940b-019e-1000-d236-e9cbb7f07989",
-        "name": "PutHDFS",
-        "comments": "",
+        "name": "PutHDFS_monthly",
+        "comments": "Scrive i Parquet mensili su HDFS in directory partizionate per MONTH.",
         "position": {
           "x": 656.0,
-          "y": 192.0
+          "y": 208.0
         },
         "type": "org.apache.nifi.processors.hadoop.PutHDFS",
         "bundle": {
@@ -127,7 +105,7 @@
           "kerberos-user-service": null,
           "writing-strategy": "writeAndRename",
           "Kerberos Relogin Period": "4 hours",
-          "Directory": "/sabd/processed/",
+          "Directory": "/sabd/processed_monthly/MONTH=${MONTH}/",
           "Conflict Resolution Strategy": "replace"
         },
         "propertyDescriptors": {
@@ -485,11 +463,148 @@
       {
         "identifier": "e1e2e3e4-0003-0003-0003-000000000003",
         "instanceIdentifier": "f1f2f3f4-0003-0003-0003-000000000003",
-        "name": "UpdateAttribute",
-        "comments": "",
+        "name": "UpdateAttribute_monthly",
+        "comments": "Imposta filename Parquet e attributo MONTH dal nome del CSV.",
         "position": {
           "x": 360.0,
           "y": 208.0
+        },
+        "type": "org.apache.nifi.processors.attributes.UpdateAttribute",
+        "bundle": {
+          "group": "org.apache.nifi",
+          "artifact": "nifi-update-attribute-nar",
+          "version": "1.25.0"
+        },
+        "properties": {
+          "filename": "${filename:substringBeforeLast('.')}.parquet",
+          "MONTH": "${filename:substring(4,6)}"
+        },
+        "propertyDescriptors": {
+          "filename": {
+            "name": "filename",
+            "displayName": "filename",
+            "identifiesControllerService": false,
+            "sensitive": false
+          },
+          "MONTH": {
+            "name": "MONTH",
+            "displayName": "MONTH",
+            "identifiesControllerService": false,
+            "sensitive": false
+          }
+        },
+        "style": {
+          "background-color": "#a020f0"
+        },
+        "schedulingPeriod": "0 sec",
+        "schedulingStrategy": "TIMER_DRIVEN",
+        "executionNode": "ALL",
+        "penaltyDuration": "30 sec",
+        "yieldDuration": "1 sec",
+        "bulletinLevel": "WARN",
+        "runDurationMillis": 0,
+        "concurrentlySchedulableTaskCount": 1,
+        "autoTerminatedRelationships": [],
+        "scheduledState": "ENABLED",
+        "retryCount": 10,
+        "retriedRelationships": [],
+        "backoffMechanism": "PENALIZE_FLOWFILE",
+        "maxBackoffPeriod": "10 mins",
+        "componentType": "PROCESSOR",
+        "groupIdentifier": "8311ddf1-5082-3d8d-983a-35bfdca4fd27"
+      },
+      {
+        "identifier": "d86382f6-78c9-4701-be80-f91d0f7351a5",
+        "instanceIdentifier": "12e9f2c0-d914-4654-abd3-f1a9fe34e627",
+        "name": "MergeRecord_single",
+        "comments": "Unisce i quattro CSV in un unico FlowFile Parquet per il confronto single-file.",
+        "position": {
+          "x": 56.0,
+          "y": 420.0
+        },
+        "type": "org.apache.nifi.processors.standard.MergeRecord",
+        "bundle": {
+          "group": "org.apache.nifi",
+          "artifact": "nifi-standard-nar",
+          "version": "1.25.0"
+        },
+        "properties": {
+          "record-writer": "2f456180-ca4c-3a4c-85b7-58a6f4ae5c95",
+          "record-reader": "a9f2a07b-0c75-4bc7-9b48-2d77bfe2f2a1",
+          "merge-strategy": "Bin-Packing Algorithm",
+          "min-records": "1000000000",
+          "max-records": "1000000000",
+          "max-bin-age": "30 sec"
+        },
+        "propertyDescriptors": {
+          "record-writer": {
+            "name": "record-writer",
+            "displayName": "Record Writer",
+            "identifiesControllerService": true,
+            "sensitive": false
+          },
+          "record-reader": {
+            "name": "record-reader",
+            "displayName": "Record Reader",
+            "identifiesControllerService": true,
+            "sensitive": false
+          },
+          "merge-strategy": {
+            "name": "merge-strategy",
+            "displayName": "Merge Strategy",
+            "identifiesControllerService": false,
+            "sensitive": false
+          },
+          "min-records": {
+            "name": "min-records",
+            "displayName": "Minimum Number of Records",
+            "identifiesControllerService": false,
+            "sensitive": false
+          },
+          "max-records": {
+            "name": "max-records",
+            "displayName": "Maximum Number of Records",
+            "identifiesControllerService": false,
+            "sensitive": false
+          },
+          "max-bin-age": {
+            "name": "max-bin-age",
+            "displayName": "Max Bin Age",
+            "identifiesControllerService": false,
+            "sensitive": false
+          }
+        },
+        "style": {
+          "background-color": "#ff8408"
+        },
+        "schedulingPeriod": "0 sec",
+        "schedulingStrategy": "TIMER_DRIVEN",
+        "executionNode": "ALL",
+        "penaltyDuration": "30 sec",
+        "yieldDuration": "1 sec",
+        "bulletinLevel": "WARN",
+        "runDurationMillis": 0,
+        "concurrentlySchedulableTaskCount": 1,
+        "autoTerminatedRelationships": [
+          "original",
+          "failure"
+        ],
+        "scheduledState": "ENABLED",
+        "retryCount": 10,
+        "retriedRelationships": [],
+        "backoffMechanism": "PENALIZE_FLOWFILE",
+        "maxBackoffPeriod": "10 mins",
+        "componentType": "PROCESSOR",
+        "groupIdentifier": "8311ddf1-5082-3d8d-983a-35bfdca4fd27"
+      },
+      {
+        "identifier": "18c159d7-0edd-48c3-857a-e03c422f01fe",
+        "instanceIdentifier": "157e51b9-3a01-4c30-acaa-598efa796ab1",
+        "name": "UpdateAttribute_single",
+        "comments": "Imposta il nome del Parquet unico.",
+        "position": {
+          "x": 360.0,
+          "y": 420.0
         },
         "type": "org.apache.nifi.processors.attributes.UpdateAttribute",
         "bundle": {
@@ -520,6 +635,199 @@
         "runDurationMillis": 0,
         "concurrentlySchedulableTaskCount": 1,
         "autoTerminatedRelationships": [],
+        "scheduledState": "ENABLED",
+        "retryCount": 10,
+        "retriedRelationships": [],
+        "backoffMechanism": "PENALIZE_FLOWFILE",
+        "maxBackoffPeriod": "10 mins",
+        "componentType": "PROCESSOR",
+        "groupIdentifier": "8311ddf1-5082-3d8d-983a-35bfdca4fd27"
+      },
+      {
+        "identifier": "775193d5-05eb-41c4-b8c1-1cf27eb0df0e",
+        "instanceIdentifier": "0d97631f-121f-414f-95a5-81d7454f76fa",
+        "name": "PutHDFS_single",
+        "comments": "Scrive il Parquet unico su HDFS per benchmark comparativo.",
+        "position": {
+          "x": 656.0,
+          "y": 420.0
+        },
+        "type": "org.apache.nifi.processors.hadoop.PutHDFS",
+        "bundle": {
+          "group": "org.apache.nifi",
+          "artifact": "nifi-hadoop-nar",
+          "version": "1.25.0"
+        },
+        "properties": {
+          "Permissions umask": null,
+          "Hadoop Configuration Resources": "/opt/nifi/nifi-config/core-site.xml,/opt/nifi/nifi-config/hdfs-site.xml",
+          "Remote Owner": null,
+          "Additional Classpath Resources": null,
+          "Compression codec": "NONE",
+          "IO Buffer Size": null,
+          "Remote Group": null,
+          "Block Size": null,
+          "kerberos-credentials-service": null,
+          "Kerberos Keytab": null,
+          "Ignore Locality": "false",
+          "Kerberos Principal": null,
+          "Replication": null,
+          "kerberos-user-service": null,
+          "writing-strategy": "writeAndRename",
+          "Kerberos Relogin Period": "4 hours",
+          "Directory": "/sabd/processed_single/",
+          "Conflict Resolution Strategy": "replace"
+        },
+        "propertyDescriptors": {
+          "Permissions umask": {
+            "name": "Permissions umask",
+            "displayName": "Permissions umask",
+            "identifiesControllerService": false,
+            "sensitive": false
+          },
+          "Hadoop Configuration Resources": {
+            "name": "Hadoop Configuration Resources",
+            "displayName": "Hadoop Configuration Resources",
+            "identifiesControllerService": false,
+            "sensitive": false,
+            "resourceDefinition": {
+              "cardinality": "MULTIPLE",
+              "resourceTypes": [
+                "FILE"
+              ]
+            }
+          },
+          "Remote Owner": {
+            "name": "Remote Owner",
+            "displayName": "Remote Owner",
+            "identifiesControllerService": false,
+            "sensitive": false
+          },
+          "Additional Classpath Resources": {
+            "name": "Additional Classpath Resources",
+            "displayName": "Additional Classpath Resources",
+            "identifiesControllerService": false,
+            "sensitive": false,
+            "resourceDefinition": {
+              "cardinality": "MULTIPLE",
+              "resourceTypes": [
+                "DIRECTORY",
+                "FILE"
+              ]
+            }
+          },
+          "Compression codec": {
+            "name": "Compression codec",
+            "displayName": "Compression codec",
+            "identifiesControllerService": false,
+            "sensitive": false
+          },
+          "IO Buffer Size": {
+            "name": "IO Buffer Size",
+            "displayName": "IO Buffer Size",
+            "identifiesControllerService": false,
+            "sensitive": false
+          },
+          "Remote Group": {
+            "name": "Remote Group",
+            "displayName": "Remote Group",
+            "identifiesControllerService": false,
+            "sensitive": false
+          },
+          "Block Size": {
+            "name": "Block Size",
+            "displayName": "Block Size",
+            "identifiesControllerService": false,
+            "sensitive": false
+          },
+          "kerberos-credentials-service": {
+            "name": "kerberos-credentials-service",
+            "displayName": "Kerberos Credentials Service",
+            "identifiesControllerService": true,
+            "sensitive": false
+          },
+          "Kerberos Password": {
+            "name": "Kerberos Password",
+            "displayName": "Kerberos Password",
+            "identifiesControllerService": false,
+            "sensitive": true
+          },
+          "Kerberos Keytab": {
+            "name": "Kerberos Keytab",
+            "displayName": "Kerberos Keytab",
+            "identifiesControllerService": false,
+            "sensitive": false,
+            "resourceDefinition": {
+              "cardinality": "SINGLE",
+              "resourceTypes": [
+                "FILE"
+              ]
+            }
+          },
+          "Ignore Locality": {
+            "name": "Ignore Locality",
+            "displayName": "Ignore Locality",
+            "identifiesControllerService": false,
+            "sensitive": false
+          },
+          "Kerberos Principal": {
+            "name": "Kerberos Principal",
+            "displayName": "Kerberos Principal",
+            "identifiesControllerService": false,
+            "sensitive": false
+          },
+          "Replication": {
+            "name": "Replication",
+            "displayName": "Replication",
+            "identifiesControllerService": false,
+            "sensitive": false
+          },
+          "kerberos-user-service": {
+            "name": "kerberos-user-service",
+            "displayName": "Kerberos User Service",
+            "identifiesControllerService": true,
+            "sensitive": false
+          },
+          "writing-strategy": {
+            "name": "writing-strategy",
+            "displayName": "Writing Strategy",
+            "identifiesControllerService": false,
+            "sensitive": false
+          },
+          "Kerberos Relogin Period": {
+            "name": "Kerberos Relogin Period",
+            "displayName": "Kerberos Relogin Period",
+            "identifiesControllerService": false,
+            "sensitive": false
+          },
+          "Directory": {
+            "name": "Directory",
+            "displayName": "Directory",
+            "identifiesControllerService": false,
+            "sensitive": false
+          },
+          "Conflict Resolution Strategy": {
+            "name": "Conflict Resolution Strategy",
+            "displayName": "Conflict Resolution Strategy",
+            "identifiesControllerService": false,
+            "sensitive": false
+          }
+        },
+        "style": {
+          "background-color": "#000000"
+        },
+        "schedulingPeriod": "0 sec",
+        "schedulingStrategy": "TIMER_DRIVEN",
+        "executionNode": "ALL",
+        "penaltyDuration": "30 sec",
+        "yieldDuration": "1 sec",
+        "bulletinLevel": "WARN",
+        "runDurationMillis": 0,
+        "concurrentlySchedulableTaskCount": 1,
+        "autoTerminatedRelationships": [
+          "success",
+          "failure"
+        ],
         "scheduledState": "ENABLED",
         "retryCount": 10,
         "retriedRelationships": [],
@@ -576,7 +884,7 @@
           "id": "d6ebb666-88c2-31db-8d66-ae809b1b7a7f",
           "type": "PROCESSOR",
           "groupId": "8311ddf1-5082-3d8d-983a-35bfdca4fd27",
-          "name": "MergeRecord",
+          "name": "ConvertRecord_monthly",
           "comments": "",
           "instanceIdentifier": "3ae4e854-019e-1000-3426-1fe08cf3d0e0"
         },
@@ -584,14 +892,14 @@
           "id": "e1e2e3e4-0003-0003-0003-000000000003",
           "type": "PROCESSOR",
           "groupId": "8311ddf1-5082-3d8d-983a-35bfdca4fd27",
-          "name": "UpdateAttribute",
+          "name": "UpdateAttribute_monthly",
           "comments": "",
           "instanceIdentifier": "f1f2f3f4-0003-0003-0003-000000000003"
         },
         "labelIndex": 1,
         "zIndex": 0,
         "selectedRelationships": [
-          "merged"
+          "success"
         ],
         "backPressureObjectThreshold": 10000,
         "backPressureDataSizeThreshold": "1 GB",
@@ -612,7 +920,7 @@
           "id": "e1e2e3e4-0003-0003-0003-000000000003",
           "type": "PROCESSOR",
           "groupId": "8311ddf1-5082-3d8d-983a-35bfdca4fd27",
-          "name": "UpdateAttribute",
+          "name": "UpdateAttribute_monthly",
           "comments": "",
           "instanceIdentifier": "f1f2f3f4-0003-0003-0003-000000000003"
         },
@@ -620,7 +928,7 @@
           "id": "ff1b3ec3-758e-3773-8175-4df6a0e5a059",
           "type": "PROCESSOR",
           "groupId": "8311ddf1-5082-3d8d-983a-35bfdca4fd27",
-          "name": "PutHDFS",
+          "name": "PutHDFS_monthly",
           "comments": "",
           "instanceIdentifier": "3b77940b-019e-1000-d236-e9cbb7f07989"
         },
@@ -656,9 +964,117 @@
           "id": "d6ebb666-88c2-31db-8d66-ae809b1b7a7f",
           "type": "PROCESSOR",
           "groupId": "8311ddf1-5082-3d8d-983a-35bfdca4fd27",
-          "name": "MergeRecord",
+          "name": "ConvertRecord_monthly",
           "comments": "",
           "instanceIdentifier": "3ae4e854-019e-1000-3426-1fe08cf3d0e0"
+        },
+        "labelIndex": 1,
+        "zIndex": 0,
+        "selectedRelationships": [
+          "success"
+        ],
+        "backPressureObjectThreshold": 10000,
+        "backPressureDataSizeThreshold": "1 GB",
+        "flowFileExpiration": "0 sec",
+        "prioritizers": [],
+        "bends": [],
+        "loadBalanceStrategy": "DO_NOT_LOAD_BALANCE",
+        "partitioningAttribute": "",
+        "loadBalanceCompression": "DO_NOT_COMPRESS",
+        "componentType": "CONNECTION",
+        "groupIdentifier": "8311ddf1-5082-3d8d-983a-35bfdca4fd27"
+      },
+      {
+        "identifier": "0acde881-f739-4129-8390-fd653c542733",
+        "instanceIdentifier": "f04d436f-f403-404b-a8ff-eef65e677936",
+        "name": "",
+        "source": {
+          "id": "a1b2c3d4-0002-0002-0002-000000000002",
+          "type": "PROCESSOR",
+          "groupId": "8311ddf1-5082-3d8d-983a-35bfdca4fd27",
+          "name": "FetchFile",
+          "comments": "",
+          "instanceIdentifier": "b1b2c3d4-0002-0002-0002-000000000002"
+        },
+        "destination": {
+          "id": "d86382f6-78c9-4701-be80-f91d0f7351a5",
+          "type": "PROCESSOR",
+          "groupId": "8311ddf1-5082-3d8d-983a-35bfdca4fd27",
+          "name": "MergeRecord_single",
+          "comments": "Unisce i quattro CSV in un unico FlowFile Parquet per il confronto single-file.",
+          "instanceIdentifier": "12e9f2c0-d914-4654-abd3-f1a9fe34e627"
+        },
+        "labelIndex": 1,
+        "zIndex": 0,
+        "selectedRelationships": [
+          "success"
+        ],
+        "backPressureObjectThreshold": 10000,
+        "backPressureDataSizeThreshold": "1 GB",
+        "flowFileExpiration": "0 sec",
+        "prioritizers": [],
+        "bends": [],
+        "loadBalanceStrategy": "DO_NOT_LOAD_BALANCE",
+        "partitioningAttribute": "",
+        "loadBalanceCompression": "DO_NOT_COMPRESS",
+        "componentType": "CONNECTION",
+        "groupIdentifier": "8311ddf1-5082-3d8d-983a-35bfdca4fd27"
+      },
+      {
+        "identifier": "6f421e8e-2b41-4fca-93f4-8e92baa874db",
+        "instanceIdentifier": "440aaae8-48c0-4d7e-9302-51a9ed319fd7",
+        "name": "",
+        "source": {
+          "id": "d86382f6-78c9-4701-be80-f91d0f7351a5",
+          "type": "PROCESSOR",
+          "groupId": "8311ddf1-5082-3d8d-983a-35bfdca4fd27",
+          "name": "MergeRecord_single",
+          "comments": "Unisce i quattro CSV in un unico FlowFile Parquet per il confronto single-file.",
+          "instanceIdentifier": "12e9f2c0-d914-4654-abd3-f1a9fe34e627"
+        },
+        "destination": {
+          "id": "18c159d7-0edd-48c3-857a-e03c422f01fe",
+          "type": "PROCESSOR",
+          "groupId": "8311ddf1-5082-3d8d-983a-35bfdca4fd27",
+          "name": "UpdateAttribute_single",
+          "comments": "Imposta il nome del Parquet unico.",
+          "instanceIdentifier": "157e51b9-3a01-4c30-acaa-598efa796ab1"
+        },
+        "labelIndex": 1,
+        "zIndex": 0,
+        "selectedRelationships": [
+          "merged"
+        ],
+        "backPressureObjectThreshold": 10000,
+        "backPressureDataSizeThreshold": "1 GB",
+        "flowFileExpiration": "0 sec",
+        "prioritizers": [],
+        "bends": [],
+        "loadBalanceStrategy": "DO_NOT_LOAD_BALANCE",
+        "partitioningAttribute": "",
+        "loadBalanceCompression": "DO_NOT_COMPRESS",
+        "componentType": "CONNECTION",
+        "groupIdentifier": "8311ddf1-5082-3d8d-983a-35bfdca4fd27"
+      },
+      {
+        "identifier": "c64a7d15-9e64-4000-9eb8-eb7b068771a2",
+        "instanceIdentifier": "fe4a3edf-ecac-4e42-bc8f-ff4594ecbf0b",
+        "name": "",
+        "source": {
+          "id": "18c159d7-0edd-48c3-857a-e03c422f01fe",
+          "type": "PROCESSOR",
+          "groupId": "8311ddf1-5082-3d8d-983a-35bfdca4fd27",
+          "name": "UpdateAttribute_single",
+          "comments": "Imposta il nome del Parquet unico.",
+          "instanceIdentifier": "157e51b9-3a01-4c30-acaa-598efa796ab1"
+        },
+        "destination": {
+          "id": "775193d5-05eb-41c4-b8c1-1cf27eb0df0e",
+          "type": "PROCESSOR",
+          "groupId": "8311ddf1-5082-3d8d-983a-35bfdca4fd27",
+          "name": "PutHDFS_single",
+          "comments": "Scrive il Parquet unico su HDFS per benchmark comparativo.",
+          "instanceIdentifier": "0d97631f-121f-414f-95a5-81d7454f76fa"
         },
         "labelIndex": 1,
         "zIndex": 0,
@@ -751,7 +1167,7 @@
           "schema-access-strategy": "schema-text-property",
           "schema-version": null,
           "csvutils-character-set": "UTF-8",
-          "schema-text": "{\"type\":\"record\",\"name\":\"Flight\",\"namespace\":\"sabd\",\"fields\":[{\"name\":\"YEAR\",\"type\":[\"null\",\"int\"],\"default\":null},{\"name\":\"MONTH\",\"type\":[\"null\",\"int\"],\"default\":null},{\"name\":\"DAY_OF_MONTH\",\"type\":[\"null\",\"int\"],\"default\":null},{\"name\":\"OP_UNIQUE_CARRIER\",\"type\":[\"null\",\"string\"],\"default\":null},{\"name\":\"CRS_DEP_TIME\",\"type\":[\"null\",\"int\"],\"default\":null},{\"name\":\"DEP_DELAY\",\"type\":[\"null\",\"double\"],\"default\":null},{\"name\":\"ARR_DELAY\",\"type\":[\"null\",\"double\"],\"default\":null},{\"name\":\"CANCELLED\",\"type\":[\"null\",\"double\"],\"default\":null},{\"name\":\"DIVERTED\",\"type\":[\"null\",\"double\"],\"default\":null},{\"name\":\"CARRIER_DELAY\",\"type\":[\"null\",\"double\"],\"default\":null},{\"name\":\"WEATHER_DELAY\",\"type\":[\"null\",\"double\"],\"default\":null},{\"name\":\"NAS_DELAY\",\"type\":[\"null\",\"double\"],\"default\":null},{\"name\":\"SECURITY_DELAY\",\"type\":[\"null\",\"double\"],\"default\":null},{\"name\":\"LATE_AIRCRAFT_DELAY\",\"type\":[\"null\",\"double\"],\"default\":null}]}"
+          "schema-text": "{\"type\":\"record\",\"name\":\"Flight\",\"namespace\":\"sabd\",\"fields\":[{\"name\":\"YEAR\",\"type\":[\"null\",\"int\"],\"default\":null},{\"name\":\"DAY_OF_MONTH\",\"type\":[\"null\",\"int\"],\"default\":null},{\"name\":\"OP_UNIQUE_CARRIER\",\"type\":[\"null\",\"string\"],\"default\":null},{\"name\":\"CRS_DEP_TIME\",\"type\":[\"null\",\"int\"],\"default\":null},{\"name\":\"DEP_DELAY\",\"type\":[\"null\",\"double\"],\"default\":null},{\"name\":\"ARR_DELAY\",\"type\":[\"null\",\"double\"],\"default\":null},{\"name\":\"CANCELLED\",\"type\":[\"null\",\"double\"],\"default\":null},{\"name\":\"DIVERTED\",\"type\":[\"null\",\"double\"],\"default\":null},{\"name\":\"CARRIER_DELAY\",\"type\":[\"null\",\"double\"],\"default\":null},{\"name\":\"WEATHER_DELAY\",\"type\":[\"null\",\"double\"],\"default\":null},{\"name\":\"NAS_DELAY\",\"type\":[\"null\",\"double\"],\"default\":null},{\"name\":\"SECURITY_DELAY\",\"type\":[\"null\",\"double\"],\"default\":null},{\"name\":\"LATE_AIRCRAFT_DELAY\",\"type\":[\"null\",\"double\"],\"default\":null}]}"
         },
         "propertyDescriptors": {
           "ignore-csv-header": {
@@ -1271,6 +1687,197 @@
         "controllerServiceApis": [
           {
             "type": "org.apache.nifi.serialization.RecordSetWriterFactory",
+            "bundle": {
+              "group": "org.apache.nifi",
+              "artifact": "nifi-standard-services-api-nar",
+              "version": "1.25.0"
+            }
+          }
+        ],
+        "scheduledState": "ENABLED",
+        "bulletinLevel": "WARN",
+        "componentType": "CONTROLLER_SERVICE",
+        "groupIdentifier": "8311ddf1-5082-3d8d-983a-35bfdca4fd27"
+      },
+      {
+        "identifier": "a9f2a07b-0c75-4bc7-9b48-2d77bfe2f2a1",
+        "instanceIdentifier": "9d28b2b1-cf8b-44fe-9a7a-6f0e5b0e2bb0",
+        "name": "CSVReader_single_with_MONTH",
+        "comments": "",
+        "type": "org.apache.nifi.csv.CSVReader",
+        "bundle": {
+          "group": "org.apache.nifi",
+          "artifact": "nifi-record-serialization-services-nar",
+          "version": "1.25.0"
+        },
+        "properties": {
+          "ignore-csv-header": "false",
+          "schema-branch": null,
+          "Trim double quote": "true",
+          "CSV Format": "custom",
+          "Quote Character": "\"",
+          "csvutils-allow-duplicate-header-names": "true",
+          "Value Separator": ",",
+          "Record Separator": "\\n",
+          "Timestamp Format": null,
+          "Escape Character": "\\",
+          "Date Format": null,
+          "Null String": null,
+          "Skip Header Line": "true",
+          "Trim Fields": "true",
+          "schema-name": "${schema.name}",
+          "schema-registry": null,
+          "csv-reader-csv-parser": "commons-csv",
+          "Time Format": null,
+          "Comment Marker": null,
+          "schema-access-strategy": "schema-text-property",
+          "schema-version": null,
+          "csvutils-character-set": "UTF-8",
+          "schema-text": "{\"type\":\"record\",\"name\":\"Flight\",\"namespace\":\"sabd\",\"fields\":[{\"name\":\"YEAR\",\"type\":[\"null\",\"int\"],\"default\":null},{\"name\":\"MONTH\",\"type\":[\"null\",\"int\"],\"default\":null},{\"name\":\"DAY_OF_MONTH\",\"type\":[\"null\",\"int\"],\"default\":null},{\"name\":\"OP_UNIQUE_CARRIER\",\"type\":[\"null\",\"string\"],\"default\":null},{\"name\":\"CRS_DEP_TIME\",\"type\":[\"null\",\"int\"],\"default\":null},{\"name\":\"DEP_DELAY\",\"type\":[\"null\",\"double\"],\"default\":null},{\"name\":\"ARR_DELAY\",\"type\":[\"null\",\"double\"],\"default\":null},{\"name\":\"CANCELLED\",\"type\":[\"null\",\"double\"],\"default\":null},{\"name\":\"DIVERTED\",\"type\":[\"null\",\"double\"],\"default\":null},{\"name\":\"CARRIER_DELAY\",\"type\":[\"null\",\"double\"],\"default\":null},{\"name\":\"WEATHER_DELAY\",\"type\":[\"null\",\"double\"],\"default\":null},{\"name\":\"NAS_DELAY\",\"type\":[\"null\",\"double\"],\"default\":null},{\"name\":\"SECURITY_DELAY\",\"type\":[\"null\",\"double\"],\"default\":null},{\"name\":\"LATE_AIRCRAFT_DELAY\",\"type\":[\"null\",\"double\"],\"default\":null}]}"
+        },
+        "propertyDescriptors": {
+          "ignore-csv-header": {
+            "name": "ignore-csv-header",
+            "displayName": "Ignore CSV Header Column Names",
+            "identifiesControllerService": false,
+            "sensitive": false
+          },
+          "schema-branch": {
+            "name": "schema-branch",
+            "displayName": "Schema Branch",
+            "identifiesControllerService": false,
+            "sensitive": false
+          },
+          "Trim double quote": {
+            "name": "Trim double quote",
+            "displayName": "Trim double quote",
+            "identifiesControllerService": false,
+            "sensitive": false
+          },
+          "CSV Format": {
+            "name": "CSV Format",
+            "displayName": "CSV Format",
+            "identifiesControllerService": false,
+            "sensitive": false
+          },
+          "Quote Character": {
+            "name": "Quote Character",
+            "displayName": "Quote Character",
+            "identifiesControllerService": false,
+            "sensitive": false
+          },
+          "csvutils-allow-duplicate-header-names": {
+            "name": "csvutils-allow-duplicate-header-names",
+            "displayName": "Allow Duplicate Header Names",
+            "identifiesControllerService": false,
+            "sensitive": false
+          },
+          "Value Separator": {
+            "name": "Value Separator",
+            "displayName": "Value Separator",
+            "identifiesControllerService": false,
+            "sensitive": false
+          },
+          "Record Separator": {
+            "name": "Record Separator",
+            "displayName": "Record Separator",
+            "identifiesControllerService": false,
+            "sensitive": false
+          },
+          "Timestamp Format": {
+            "name": "Timestamp Format",
+            "displayName": "Timestamp Format",
+            "identifiesControllerService": false,
+            "sensitive": false
+          },
+          "Escape Character": {
+            "name": "Escape Character",
+            "displayName": "Escape Character",
+            "identifiesControllerService": false,
+            "sensitive": false
+          },
+          "Date Format": {
+            "name": "Date Format",
+            "displayName": "Date Format",
+            "identifiesControllerService": false,
+            "sensitive": false
+          },
+          "Null String": {
+            "name": "Null String",
+            "displayName": "Null String",
+            "identifiesControllerService": false,
+            "sensitive": false
+          },
+          "Skip Header Line": {
+            "name": "Skip Header Line",
+            "displayName": "Treat First Line as Header",
+            "identifiesControllerService": false,
+            "sensitive": false
+          },
+          "Trim Fields": {
+            "name": "Trim Fields",
+            "displayName": "Trim Fields",
+            "identifiesControllerService": false,
+            "sensitive": false
+          },
+          "schema-name": {
+            "name": "schema-name",
+            "displayName": "Schema Name",
+            "identifiesControllerService": false,
+            "sensitive": false
+          },
+          "schema-registry": {
+            "name": "schema-registry",
+            "displayName": "Schema Registry",
+            "identifiesControllerService": true,
+            "sensitive": false
+          },
+          "csv-reader-csv-parser": {
+            "name": "csv-reader-csv-parser",
+            "displayName": "CSV Parser",
+            "identifiesControllerService": false,
+            "sensitive": false
+          },
+          "Time Format": {
+            "name": "Time Format",
+            "displayName": "Time Format",
+            "identifiesControllerService": false,
+            "sensitive": false
+          },
+          "Comment Marker": {
+            "name": "Comment Marker",
+            "displayName": "Comment Marker",
+            "identifiesControllerService": false,
+            "sensitive": false
+          },
+          "schema-access-strategy": {
+            "name": "schema-access-strategy",
+            "displayName": "Schema Access Strategy",
+            "identifiesControllerService": false,
+            "sensitive": false
+          },
+          "schema-version": {
+            "name": "schema-version",
+            "displayName": "Schema Version",
+            "identifiesControllerService": false,
+            "sensitive": false
+          },
+          "csvutils-character-set": {
+            "name": "csvutils-character-set",
+            "displayName": "Character Set",
+            "identifiesControllerService": false,
+            "sensitive": false
+          },
+          "schema-text": {
+            "name": "schema-text",
+            "displayName": "Schema Text",
+            "identifiesControllerService": false,
+            "sensitive": false
+          }
+        },
+        "controllerServiceApis": [
+          {
+            "type": "org.apache.nifi.serialization.RecordReaderFactory",
             "bundle": {
               "group": "org.apache.nifi",
               "artifact": "nifi-standard-services-api-nar",

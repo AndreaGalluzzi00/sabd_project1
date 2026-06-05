@@ -19,22 +19,22 @@ from utils import build_spark_session
 
 
 SPARK_MASTER = os.getenv("SPARK_MASTER","spark://spark-master:7077")
-HDFS_INPUT = "hdfs://namenode:9000/sabd/processed/"
+DEFAULT_HDFS_INPUT = "hdfs://namenode:9000/sabd/processed_single/"
 HDFS_OUTPUT = "hdfs://namenode:9000/sabd/results/q2_df/"
 LOCAL_OUT = "/opt/results/q2_df.csv"
 
 os.makedirs(os.path.dirname(LOCAL_OUT), exist_ok=True)
 
 
-def run(spark, benchmark=False):
-    # Filtro base: voli completati (non cancellati, non deviati)
+def run(spark, benchmark=False, hdfs_input=None):
+    input_path = hdfs_input or os.getenv("HDFS_INPUT", DEFAULT_HDFS_INPUT)
     df = (
-        spark.read.parquet(HDFS_INPUT)
+        spark.read.parquet(input_path)
         .filter((col("CANCELLED") == 0) & (col("DIVERTED") == 0))
     )
 
     # Calcolo Q2
-    t0 = time.time()
+
 
     #  Calcoliamo il numero di voli, il ritardo medio all'arrivo e i ritardi medi per ciascuna categoria di ritardo per ogni compagnia aerea
     #  Coalesce converte in valore oppure null in caso null viene sostituito con literal 0.0, in modo da non influenzare la media con valori nulli
@@ -67,7 +67,7 @@ def run(spark, benchmark=False):
     if not benchmark:
         #cachato per evitare di ripetere il calcolo più volte durante la fase di output e salvataggio
         result.cache()
-
+    t0 = time.time()
     rows = result.collect()
     elapsed = time.time() - t0
 
