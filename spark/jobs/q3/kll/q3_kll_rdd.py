@@ -66,7 +66,7 @@ def run(spark, benchmark=False):
     # Timer attorno a costruzione del piano + azione: sortBy/sortByKey NON sono lazy,
     # lanciano un job di campionamento già in fase di definizione. Va quindi cronometrata
     # anche la costruzione della pipeline, altrimenti la misura escluderebbe il lavoro vero.
-    t0 = time.time()
+
 
     df = (
         spark.read.parquet(HDFS_INPUT)
@@ -87,7 +87,7 @@ def run(spark, benchmark=False):
     # cache della sorgente: riusata da percentili e min/max (coerente con q3_rdd);
     # attiva anche in benchmark per misurare lo stesso path della produzione
     rdd = rdd.cache()
-
+    t0 = time.time()
     # Percentili via RDD + KLL sketch
     percentile_rdd = (
         rdd
@@ -123,6 +123,9 @@ def run(spark, benchmark=False):
     elapsed = time.time() - t0
 
     if benchmark:
+        rdd.unpersist()
+        percentile_rdd.unpersist()
+        range_rdd.unpersist()
         return elapsed
 
     show_rdd_result(

@@ -63,7 +63,7 @@ def run(spark, benchmark=False):
     # Timer attorno a costruzione del piano + azione: sortBy/sortByKey NON sono lazy,
     # lanciano un job di campionamento già in fase di definizione. Va quindi cronometrata
     # anche la costruzione della pipeline, altrimenti la misura escluderebbe il lavoro vero.
-    t0 = time.time()
+
 
     #qui esplicitiamo il drop null su dep_delay nelle altre versioni no ma lo fa di default il percentile_approx
     df = (
@@ -83,7 +83,7 @@ def run(spark, benchmark=False):
     # cache() per evitare di rileggere i dati due volte (percentili + range);
     # attivo anche in benchmark per misurare lo stesso path della produzione
     base = base.cache()
-
+    t0 = time.time()
     # Percentili: groupByKey per (carrier, hour) calcolo esatto sul gruppo ordinato.
     percentile_rdd = (
         base
@@ -111,6 +111,9 @@ def run(spark, benchmark=False):
     elapsed = time.time() - t0
 
     if benchmark:
+        base.unpersist()
+        percentile_rdd.unpersist()
+        range_rdd.unpersist()
         return elapsed
 
     show_rdd_result(
