@@ -30,7 +30,6 @@ def run(spark, benchmark=False, hdfs_input=None):
     df.createOrReplaceTempView("flights")
 
     # Calcolo Q3 SQL
-    t0 = time.time()
 
     #NB i NULL in dep_delay vengono ignorati per natura di spark e la divisione per 100 serve a rimappare sulle fasce orarie
     percentiles = spark.sql("""
@@ -77,6 +76,7 @@ def run(spark, benchmark=False, hdfs_input=None):
     if not benchmark:
         percentiles.cache()
         delay_range.cache()
+    t0 = time.time()
 
     percentile_rows = percentiles.collect()
     range_rows = delay_range.collect()

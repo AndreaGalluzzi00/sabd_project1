@@ -35,7 +35,6 @@ def run(spark, benchmark=False, hdfs_input=None):
     )
 
     # Calcolo Percentili
-    t0 = time.time()
 
     #calcolo percentili sempre tramite percentile_approx, efficiente
     percentiles = (
@@ -63,6 +62,7 @@ def run(spark, benchmark=False, hdfs_input=None):
         #caching per evitarne il ricalcolo
         percentiles.cache()
         delay_range.cache()
+    t0 = time.time()
 
     percentile_rows = percentiles.collect()
     range_rows = delay_range.collect()
