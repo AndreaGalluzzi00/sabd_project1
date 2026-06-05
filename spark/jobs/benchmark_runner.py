@@ -14,7 +14,7 @@ from utils_output import (
 from utils import build_spark_session
 
 
-RESULTS_DIR = "/opt/spark/jobs/results"
+RESULTS_DIR = "/opt/results"
 HDFS_RESULTS_DIR = "hdfs://namenode:9000/sabd/results"
 
 DEFAULT_RUNS = 20

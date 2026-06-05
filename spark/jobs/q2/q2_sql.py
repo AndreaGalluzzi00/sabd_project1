@@ -17,55 +17,72 @@ LOCAL_OUT    = "/opt/results/q2_sql.csv"
 
 os.makedirs(os.path.dirname(LOCAL_OUT), exist_ok=True)
 
-spark = build_spark_session(
-    app_name="Q2_SQL_top10_carriers_arr_delay",
-    master=SPARK_MASTER,
-)
 
-# Lettura e registrazione come vista temporanea
-df = spark.read.parquet(HDFS_INPUT)
-df.createOrReplaceTempView("flights")
+def run(spark, benchmark=False):
+    # Lettura e registrazione come vista temporanea
+    df = spark.read.parquet(HDFS_INPUT)
+    df.createOrReplaceTempView("flights")
 
-# Calcolo Q2 con Spark SQL
-t0 = time.time()
+    # Calcolo Q2 con Spark SQL
+    t0 = time.time()
 
-# per arr_delay possiamo ignorare il valore null poichè presente solo se sono diverted o cancelled
-# per le componenti di ritardo conteggiamo nella media anche i null (settati a 0)
+    # per arr_delay possiamo ignorare il valore null poichè presente solo se sono diverted o cancelled
+    # per le componenti di ritardo conteggiamo nella media anche i null (settati a 0)
 
-# arr_delay non potrà mai essere null a causa del where su cancelled e diverted = 0
-result = spark.sql("""
-    SELECT
-        OP_UNIQUE_CARRIER,
-        COUNT(*)                                            AS num_flights, 
-        ROUND(AVG(ARR_DELAY), 4)                           AS avg_arr_delay,        
-        ROUND(AVG(COALESCE(CARRIER_DELAY,      0.0)), 4)   AS avg_carrier_delay,    
-        ROUND(AVG(COALESCE(WEATHER_DELAY,      0.0)), 4)   AS avg_weather_delay,
-        ROUND(AVG(COALESCE(NAS_DELAY,          0.0)), 4)   AS avg_nas_delay,
-        ROUND(AVG(COALESCE(SECURITY_DELAY,     0.0)), 4)   AS avg_security_delay,
-        ROUND(AVG(COALESCE(LATE_AIRCRAFT_DELAY,0.0)), 4)   AS avg_late_aircraft_delay
-    FROM flights
-    WHERE CANCELLED = 0
-      AND DIVERTED  = 0
-    GROUP BY OP_UNIQUE_CARRIER
-    HAVING COUNT(*) >= 500
-    ORDER BY avg_arr_delay DESC
-    LIMIT 10
-""")
+    # arr_delay non potrà mai essere null a causa del where su cancelled e diverted = 0
+    result = spark.sql("""
+        SELECT
+            OP_UNIQUE_CARRIER,
+            COUNT(*)                                            AS num_flights,
+            ROUND(AVG(ARR_DELAY), 4)                           AS avg_arr_delay,
+            ROUND(AVG(COALESCE(CARRIER_DELAY,      0.0)), 4)   AS avg_carrier_delay,
+            ROUND(AVG(COALESCE(WEATHER_DELAY,      0.0)), 4)   AS avg_weather_delay,
+            ROUND(AVG(COALESCE(NAS_DELAY,          0.0)), 4)   AS avg_nas_delay,
+            ROUND(AVG(COALESCE(SECURITY_DELAY,     0.0)), 4)   AS avg_security_delay,
+            ROUND(AVG(COALESCE(LATE_AIRCRAFT_DELAY,0.0)), 4)   AS avg_late_aircraft_delay
+        FROM flights
+        WHERE CANCELLED = 0
+          AND DIVERTED  = 0
+        GROUP BY OP_UNIQUE_CARRIER
+        HAVING COUNT(*) >= 500
+        ORDER BY avg_arr_delay DESC
+        LIMIT 10
+    """)
 
-result.cache()
-rows = result.collect()
-elapsed = time.time() - t0
+    if not benchmark:
+        result.cache()
 
-# Output a schermo
-show_dataframe_result(result, "Q2_SQL", elapsed, 20)
+    rows = result.collect()
+    elapsed = time.time() - t0
 
-# Salvataggio CSV locale
-save_csv_local(LOCAL_OUT, result, rows)
+    if benchmark:
+        return elapsed
 
-# Salvataggio su HDFS
-save_dataframe_hdfs(result, HDFS_OUTPUT)
+    # Output a schermo
+    show_dataframe_result(result, "Q2_SQL", elapsed, 20)
 
-print(f"\nTempo Q2 (Spark SQL): {elapsed:.2f}s")
-print(f"{'='*70}\n")
+    # Salvataggio CSV locale
+    save_csv_local(LOCAL_OUT, result, rows)
 
-spark.stop()
+    # Salvataggio su HDFS
+    save_dataframe_hdfs(result, HDFS_OUTPUT)
+
+    print(f"\nTempo Q2 (Spark SQL): {elapsed:.2f}s")
+    print(f"{'='*70}\n")
+
+    return elapsed
+
+
+def main():
+    spark = build_spark_session(
+        app_name="Q2_SQL_top10_carriers_arr_delay",
+        master=SPARK_MASTER,
+    )
+
+    run(spark, benchmark=False)
+
+    spark.stop()
+
+
+if __name__ == "__main__":
+    main()

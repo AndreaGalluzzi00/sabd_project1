@@ -4,7 +4,7 @@ import time
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..", "utils")))
 
-from pyspark.sql.functions import col, floor, min as spark_min, max as spark_max
+from pyspark.sql.functions import col, floor
 from tdigest import TDigest
 
 from utils_output import (
@@ -26,32 +26,11 @@ os.makedirs(LOCAL_OUT, exist_ok=True)
 COLS_PERC  = ["OP_UNIQUE_CARRIER", "hour", "p25", "p50", "p75", "p90"]
 COLS_RANGE = ["OP_UNIQUE_CARRIER", "min_delay", "max_delay"]
 
-spark = build_spark_session(
-    app_name="Q3_TDigest_Percentiles",
-    master=SPARK_MASTER,
-    ui_enabled=True,
-    ui_port="4040",
-)
-sc = spark.sparkContext
-
-df = (
-    spark.read.parquet(HDFS_INPUT)
-    .filter(
-        (col("OP_UNIQUE_CARRIER").isin("AA", "DL", "UA", "WN")) &
-        (col("CANCELLED") == 0)
-    )
-    .withColumn("hour", floor(col("CRS_DEP_TIME") / 100))
-    .select("OP_UNIQUE_CARRIER", "hour", "DEP_DELAY")
-    .dropna(subset=["DEP_DELAY"])
-)
-
-t0 = time.time()
 
 # Percentili via RDD + t-digest
 # combineByKey preferibile ad aggregateByKey perché usa una factory
 # (create_combiner) invece di un valore zero condiviso — evita il problema
 # di mutare lo stesso oggetto TDigest su chiavi diverse nella stessa partizione.
-
 
 # Pipeline di combining
 #   create_combiner : prima occorrenza di una chiave crea un nuovo TDigest
@@ -75,93 +54,129 @@ def merge_combiners(d1: TDigest, d2: TDigest) -> TDigest:
         d1.update(centroid.mean, centroid.count)
     return d1
 
-rdd = df.rdd.map(lambda row: (
-    (row.OP_UNIQUE_CARRIER, int(row.hour)),
-    float(row.DEP_DELAY)
-))
 
-#perchè combine by key e non aggregate by key?
-#aggregate crea lo zero value una volta per partizione ma lo riusa per tutti i calcoli della stessa andando quindi a sprcare il risultato
-# la struttura qui è ((carrier, hour ), tdigest_finale)
-percentile_rdd = (
-    rdd
-    .combineByKey(create_combiner, merge_value, merge_combiners)
-    .map(lambda kv: (
-        kv[0][0],                            # carrier
-        kv[0][1],                            # hour
-        round(kv[1].percentile(25), 2),      # p25
-        round(kv[1].percentile(50), 2),      # p50
-        round(kv[1].percentile(75), 2),      # p75
-        round(kv[1].percentile(90), 2),      # p90
+def run(spark, benchmark=False):
+    sc = spark.sparkContext
+
+    df = (
+        spark.read.parquet(HDFS_INPUT)
+        .filter(
+            (col("OP_UNIQUE_CARRIER").isin("AA", "DL", "UA", "WN")) &
+            (col("CANCELLED") == 0)
+        )
+        .withColumn("hour", floor(col("CRS_DEP_TIME") / 100))
+        .select("OP_UNIQUE_CARRIER", "hour", "DEP_DELAY")
+        .dropna(subset=["DEP_DELAY"])
+    )
+
+    t0 = time.time()
+
+    rdd = df.rdd.map(lambda row: (
+        (row.OP_UNIQUE_CARRIER, int(row.hour)),
+        float(row.DEP_DELAY)
     ))
-    .sortBy(lambda x: (x[0], x[1]))
-)
 
-# Min/Max: operazioni esatte, calcolate su DataFrame (no approssimazione)
-#ATTENZIONE QUA MODIFICATO RISPETTO A IERI
-range_rdd = (
-    rdd
-    .map(lambda kv: (kv[0][0], (kv[1], kv[1])))
-    .reduceByKey(lambda a, b: (min(a[0], b[0]), max(a[1], b[1])))
-    .map(lambda kv: (kv[0], kv[1][0], kv[1][1]))
-    .sortBy(lambda x: x[0])
-)
-percentile_rdd.cache()
-range_rdd.cache()
+    #perchè combine by key e non aggregate by key?
+    #aggregate crea lo zero value una volta per partizione ma lo riusa per tutti i calcoli della stessa andando quindi a sprcare il risultato
+    # la struttura qui è ((carrier, hour ), tdigest_finale)
+    percentile_rdd = (
+        rdd
+        .combineByKey(create_combiner, merge_value, merge_combiners)
+        .map(lambda kv: (
+            kv[0][0],                            # carrier
+            kv[0][1],                            # hour
+            round(kv[1].percentile(25), 2),      # p25
+            round(kv[1].percentile(50), 2),      # p50
+            round(kv[1].percentile(75), 2),      # p75
+            round(kv[1].percentile(90), 2),      # p90
+        ))
+        .sortBy(lambda x: (x[0], x[1]))
+    )
 
-percentile_rows = percentile_rdd.collect()
-range_rows = range_rdd.collect()
-elapsed = time.time() - t0
+    # Min/Max: operazioni esatte, calcolate su DataFrame (no approssimazione)
+    range_rdd = (
+        rdd
+        .map(lambda kv: (kv[0][0], (kv[1], kv[1])))
+        .reduceByKey(lambda a, b: (min(a[0], b[0]), max(a[1], b[1])))
+        .map(lambda kv: (kv[0], kv[1][0], kv[1][1]))
+        .sortBy(lambda x: x[0])
+    )
 
-# Output a schermo + CSV locale
-show_rdd_result(
-    rows=percentile_rows,
-    header=COLS_PERC,
-    query_name="Q3 t-digest RDD — Percentili DEP_DELAY per compagnia e fascia oraria",
-    elapsed=elapsed,
-)
+    if not benchmark:
+        percentile_rdd.cache()
+        range_rdd.cache()
 
-show_rdd_result(
-    rows=range_rows,
-    header=COLS_RANGE,
-    query_name="Q3 t-digest RDD — Min/Max DEP_DELAY per compagnia",
-    elapsed=elapsed,
-)
+    percentile_rows = percentile_rdd.collect()
+    range_rows = range_rdd.collect()
+    elapsed = time.time() - t0
 
-save_rdd_csv_local(
-    path=LOCAL_OUT_PERCENTILES,
-    header=COLS_PERC,
-    rows=percentile_rows,
-)
+    if benchmark:
+        return elapsed
 
-save_rdd_csv_local(
-    path=LOCAL_OUT_RANGE,
-    header=COLS_RANGE,
-    rows=range_rows,
-)
+    # Output a schermo + CSV locale
+    show_rdd_result(
+        rows=percentile_rows,
+        header=COLS_PERC,
+        query_name="Q3 t-digest RDD — Percentili DEP_DELAY per compagnia e fascia oraria",
+        elapsed=elapsed,
+    )
 
-# HDFS: salvataggio RDD puro con saveAsTextFile
-# HDFS: salvataggio RDD con saveAsTextFile tramite utility comune
-save_rdd_csv_hdfs(
-    sc=sc,
-    path=HDFS_OUTPUT_PERCENTILES,
-    header=COLS_PERC,
-    data_rdd=percentile_rdd,
-    row_mapper=lambda row: row,
-)
+    show_rdd_result(
+        rows=range_rows,
+        header=COLS_RANGE,
+        query_name="Q3 t-digest RDD — Min/Max DEP_DELAY per compagnia",
+        elapsed=elapsed,
+    )
 
-save_rdd_csv_hdfs(
-    sc=sc,
-    path=HDFS_OUTPUT_RANGE,
-    header=COLS_RANGE,
-    data_rdd=range_rdd,
-    row_mapper=lambda row: row,
-)
+    save_rdd_csv_local(
+        path=LOCAL_OUT_PERCENTILES,
+        header=COLS_PERC,
+        rows=percentile_rows,
+    )
 
-print(f"\nTempo Q3 t-digest RDD: {elapsed:.2f}s")
-print(f"{'=' * 70}\n")
-if os.getenv("SPARK_DEBUG_UI", "0") == "1":
-    print("\nSpark UI attiva. Apri http://localhost:4040 per vedere il DAG.")
-    input("Premi INVIO per terminare l'applicazione...")
+    save_rdd_csv_local(
+        path=LOCAL_OUT_RANGE,
+        header=COLS_RANGE,
+        rows=range_rows,
+    )
 
-spark.stop()
+    # HDFS: salvataggio RDD con saveAsTextFile tramite utility comune
+    save_rdd_csv_hdfs(
+        sc=sc,
+        path=HDFS_OUTPUT_PERCENTILES,
+        header=COLS_PERC,
+        data_rdd=percentile_rdd,
+        row_mapper=lambda row: row,
+    )
+
+    save_rdd_csv_hdfs(
+        sc=sc,
+        path=HDFS_OUTPUT_RANGE,
+        header=COLS_RANGE,
+        data_rdd=range_rdd,
+        row_mapper=lambda row: row,
+    )
+
+    print(f"\nTempo Q3 t-digest RDD: {elapsed:.2f}s")
+    print(f"{'=' * 70}\n")
+
+    return elapsed
+
+
+def main():
+    spark = build_spark_session(
+        app_name="Q3_TDigest_Percentiles",
+        master=SPARK_MASTER,
+    )
+
+    run(spark, benchmark=False)
+
+    if os.getenv("SPARK_DEBUG_UI", "0") == "1":
+        print("\nSpark UI attiva. Apri http://localhost:4040 per vedere il DAG.")
+        input("Premi INVIO per terminare l'applicazione...")
+
+    spark.stop()
+
+
+if __name__ == "__main__":
+    main()

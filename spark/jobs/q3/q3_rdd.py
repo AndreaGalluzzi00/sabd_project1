@@ -28,26 +28,6 @@ COLS_RANGE = ["OP_UNIQUE_CARRIER", "min_delay", "max_delay"]
 
 os.makedirs(LOCAL_OUT, exist_ok=True)
 
-spark = build_spark_session(
-    app_name="Q3_RDD_Percentiles",
-    master=SPARK_MASTER,
-    ui_enabled=True,
-    ui_port="4040",
-)
-sc = spark.sparkContext
-
-#qui esplicitiamo il drop null su dep_delay nelle altre versioni no ma lo fa di default il percentile_approx
-df = (
-    spark.read.parquet(HDFS_INPUT)
-    .filter(
-        (col("OP_UNIQUE_CARRIER").isin("AA", "DL", "UA", "WN")) &
-        (col("CANCELLED") == 0)
-    )
-    .withColumn("hour", floor(col("CRS_DEP_TIME") / 100))
-    .select("OP_UNIQUE_CARRIER", "hour", "DEP_DELAY")
-    .dropna(subset=["DEP_DELAY"])
-)
-
 
 # Percentile esatto su lista ordinata (interpolazione lineare). Eseguito sugli executor dentro mapValues.
 def percentile(sorted_vals, q):
@@ -77,87 +57,126 @@ def quantiles(values_iter):
     )
 
 
-t0 = time.time()
+def run(spark, benchmark=False):
+    sc = spark.sparkContext
 
-# Base RDD (carrier, hour, delay) riusato per percentili e min/max.
-base = (
-    df.rdd
-    .map(lambda r: (r["OP_UNIQUE_CARRIER"], int(r["hour"]), float(r["DEP_DELAY"])))
-    .cache()
-)
+    #qui esplicitiamo il drop null su dep_delay nelle altre versioni no ma lo fa di default il percentile_approx
+    df = (
+        spark.read.parquet(HDFS_INPUT)
+        .filter(
+            (col("OP_UNIQUE_CARRIER").isin("AA", "DL", "UA", "WN")) &
+            (col("CANCELLED") == 0)
+        )
+        .withColumn("hour", floor(col("CRS_DEP_TIME") / 100))
+        .select("OP_UNIQUE_CARRIER", "hour", "DEP_DELAY")
+        .dropna(subset=["DEP_DELAY"])
+    )
 
-# Percentili: groupByKey per (carrier, hour) calcolo esatto sul gruppo ordinato.
-percentile_rdd = (
-    base
-    .map(lambda t: ((t[0], t[1]), t[2]))               # chiave = (carrier, hour) valore = delay
-    .groupByKey()                                                   # raggruppa per (carrier, hour)
-    .mapValues(quantiles)                                           # calcola percentili sul gruppo solo sui valori, chiavi intatte
-    .map(lambda kv: (kv[0][0], kv[0][1], *kv[1]))      # appiattisce il risultato
-    .sortBy(lambda x: (x[0], x[1]))
-)
+    t0 = time.time()
 
-# Min/Max DEP_DELAY per compagnia.
-range_rdd = (
-    base
-    .map(lambda t: (t[0], (t[2], t[2])))  # chiave solo carrier value = (ritardo, ritardo)
-    .reduceByKey(lambda a, b: (min(a[0], b[0]), max(a[1], b[1]))) # calcolo effettivo del minimo e massimo sulle coppie
-    .sortByKey() # qui ottieni quindi (carrier, (min,max))
-)
+    # Base RDD (carrier, hour, delay) riusato per percentili e min/max.
+    base = df.rdd.map(lambda r: (r["OP_UNIQUE_CARRIER"], int(r["hour"]), float(r["DEP_DELAY"])))
 
-# Caching dei risultati per evitare
-percentile_rdd.cache()
-range_rdd.cache()
+    if not benchmark:
+        # cache() per evitare di rileggere i dati due volte (percentili + range)
+        base = base.cache()
 
-percentile_rows = percentile_rdd.collect()
-#modifica effettivamente la struttura da [a,(b,c))] ad [a,b,c]
-range_rows = [(c, mn, mx) for c, (mn, mx) in range_rdd.collect()]
-elapsed = time.time() - t0
+    # Percentili: groupByKey per (carrier, hour) calcolo esatto sul gruppo ordinato.
+    percentile_rdd = (
+        base
+        .map(lambda t: ((t[0], t[1]), t[2]))               # chiave = (carrier, hour) valore = delay
+        .groupByKey()                                       # raggruppa per (carrier, hour)
+        .mapValues(quantiles)                               # calcola percentili sul gruppo solo sui valori, chiavi intatte
+        .map(lambda kv: (kv[0][0], kv[0][1], *kv[1]))      # appiattisce il risultato
+        .sortBy(lambda x: (x[0], x[1]))
+    )
 
-show_rdd_result(
-    rows=percentile_rows,
-    header=COLS_PERC,
-    query_name="Q3 RDD — Percentili DEP_DELAY per compagnia e fascia oraria",
-    elapsed=elapsed,
-)
+    # Min/Max DEP_DELAY per compagnia.
+    range_rdd = (
+        base
+        .map(lambda t: (t[0], (t[2], t[2])))  # chiave solo carrier value = (ritardo, ritardo)
+        .reduceByKey(lambda a, b: (min(a[0], b[0]), max(a[1], b[1]))) # calcolo effettivo del minimo e massimo sulle coppie
+        .sortByKey() # qui ottieni quindi (carrier, (min,max))
+    )
 
-show_rdd_result(
-    rows=range_rows,
-    header=COLS_RANGE,
-    query_name="Q3 RDD — Min/Max DEP_DELAY per compagnia",
-    elapsed=elapsed,
-)
+    if not benchmark:
+        # Caching dei risultati per evitare ricalcolo durante il salvataggio HDFS
+        percentile_rdd.cache()
+        range_rdd.cache()
 
-save_rdd_csv_local(
-    path=LOCAL_OUT_PERCENTILES,
-    header=COLS_PERC,
-    rows=percentile_rows,
-)
+    percentile_rows = percentile_rdd.collect()
+    range_rows = [(c, mn, mx) for c, (mn, mx) in range_rdd.collect()]
+    elapsed = time.time() - t0
 
-save_rdd_csv_local(
-    path=LOCAL_OUT_RANGE,
-    header=COLS_RANGE,
-    rows=range_rows,
-)
+    if benchmark:
+        return elapsed
 
-save_rdd_csv_hdfs(
-    sc=sc,
-    path=HDFS_OUTPUT_PERCENTILES,
-    header=COLS_PERC,
-    data_rdd=percentile_rdd,
-    row_mapper=lambda row: row, #appiattisce come fatto prima ma per rdd sul cluster
-)
+    show_rdd_result(
+        rows=percentile_rows,
+        header=COLS_PERC,
+        query_name="Q3 RDD — Percentili DEP_DELAY per compagnia e fascia oraria",
+        elapsed=elapsed,
+    )
 
-save_rdd_csv_hdfs(
-    sc=sc,
-    path=HDFS_OUTPUT_RANGE,
-    header=COLS_RANGE,
-    data_rdd=range_rdd,
-    row_mapper=lambda kv: [
-        kv[0],
-        kv[1][0],
-        kv[1][1],
-    ],
-)
+    show_rdd_result(
+        rows=range_rows,
+        header=COLS_RANGE,
+        query_name="Q3 RDD — Min/Max DEP_DELAY per compagnia",
+        elapsed=elapsed,
+    )
 
-print(f"\nTempo Q3 query/calcolo (RDD, esatto): {elapsed:.2f}s")
-print(f"{'='*70}\n")
+    save_rdd_csv_local(
+        path=LOCAL_OUT_PERCENTILES,
+        header=COLS_PERC,
+        rows=percentile_rows,
+    )
+
+    save_rdd_csv_local(
+        path=LOCAL_OUT_RANGE,
+        header=COLS_RANGE,
+        rows=range_rows,
+    )
+
+    save_rdd_csv_hdfs(
+        sc=sc,
+        path=HDFS_OUTPUT_PERCENTILES,
+        header=COLS_PERC,
+        data_rdd=percentile_rdd,
+        row_mapper=lambda row: row, #appiattisce come fatto prima ma per rdd sul cluster
+    )
+
+    save_rdd_csv_hdfs(
+        sc=sc,
+        path=HDFS_OUTPUT_RANGE,
+        header=COLS_RANGE,
+        data_rdd=range_rdd,
+        row_mapper=lambda kv: [
+            kv[0],
+            kv[1][0],
+            kv[1][1],
+        ],
+    )
+
+    print(f"\nTempo Q3 query/calcolo (RDD, esatto): {elapsed:.2f}s")
+    print(f"{'='*70}\n")
+
+    return elapsed
+
+
+def main():
+    spark = build_spark_session(
+        app_name="Q3_RDD_Percentiles",
+        master=SPARK_MASTER,
+    )
+
+    run(spark, benchmark=False)
+
+    if os.getenv("SPARK_DEBUG_UI", "0") == "1":
+        print("\nSpark UI attiva. Apri http://localhost:4040 per vedere il DAG.")
+        input("Premi INVIO per terminare l'applicazione...")
+
+    spark.stop()
+
+
+if __name__ == "__main__":
+    main()

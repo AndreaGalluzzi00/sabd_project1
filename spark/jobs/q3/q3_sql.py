@@ -22,101 +22,116 @@ LOCAL_OUT = "/opt/results"
 os.makedirs(LOCAL_OUT, exist_ok=True)
 os.makedirs(os.path.dirname(LOCAL_OUT_PERCENTILES), exist_ok=True)
 
-spark = build_spark_session(
-    app_name="Q3_SQL_Percentiles",
-    master=SPARK_MASTER,
-)
 
-df = spark.read.parquet(HDFS_INPUT)
-# registro questo DataFrame come tabella SQL temporanea chiamata flights
-df.createOrReplaceTempView("flights")
+def run(spark, benchmark=False):
+    df = spark.read.parquet(HDFS_INPUT)
+    # registro questo DataFrame come tabella SQL temporanea chiamata flights
+    df.createOrReplaceTempView("flights")
 
-# Calcolo Q3 SQL
+    # Calcolo Q3 SQL
+    t0 = time.time()
 
-t0 = time.time()
+    #NB i NULL in dep_delay vengono ignorati per natura di spark e la divisione per 100 serve a rimappare sulle fasce orarie
+    percentiles = spark.sql("""
+        SELECT
+            OP_UNIQUE_CARRIER,
+            FLOOR(CRS_DEP_TIME / 100) AS hour,
 
-#NB i NULL in dep_delay vengono ignorati per natura di spark e la divisione  per 100 serve a rimappare sulle fasce orarie
-percentiles = spark.sql("""
-    SELECT
-        OP_UNIQUE_CARRIER,
-        FLOOR(CRS_DEP_TIME / 100) AS hour,
+            percentile_approx(DEP_DELAY, 0.25) AS p25,
+            percentile_approx(DEP_DELAY, 0.50) AS p50,
+            percentile_approx(DEP_DELAY, 0.75) AS p75,
+            percentile_approx(DEP_DELAY, 0.90) AS p90
 
-        percentile_approx(DEP_DELAY, 0.25) AS p25,
-        percentile_approx(DEP_DELAY, 0.50) AS p50,
-        percentile_approx(DEP_DELAY, 0.75) AS p75,
-        percentile_approx(DEP_DELAY, 0.90) AS p90
+        FROM flights
 
-    FROM flights
+        WHERE OP_UNIQUE_CARRIER IN ('AA', 'DL', 'UA', 'WN')
+          AND CANCELLED = 0
 
-    WHERE OP_UNIQUE_CARRIER IN ('AA', 'DL', 'UA', 'WN')
-      AND CANCELLED = 0
+        GROUP BY
+            OP_UNIQUE_CARRIER,
+            FLOOR(CRS_DEP_TIME / 100)
 
-    GROUP BY
-        OP_UNIQUE_CARRIER,
-        FLOOR(CRS_DEP_TIME / 100)
+        ORDER BY
+            OP_UNIQUE_CARRIER,
+            FLOOR(CRS_DEP_TIME / 100)
+    """)
 
-    ORDER BY
-        OP_UNIQUE_CARRIER,
-        FLOOR(CRS_DEP_TIME / 100)
-""")
+    delay_range = spark.sql("""
+        SELECT
+            OP_UNIQUE_CARRIER,
 
-delay_range = spark.sql("""
-    SELECT
-        OP_UNIQUE_CARRIER,
+            MIN(DEP_DELAY) AS min_delay,
+            MAX(DEP_DELAY) AS max_delay
 
-        MIN(DEP_DELAY) AS min_delay,
-        MAX(DEP_DELAY) AS max_delay
+        FROM flights
 
-    FROM flights
+        WHERE OP_UNIQUE_CARRIER IN ('AA', 'DL', 'UA', 'WN')
+          AND CANCELLED = 0
 
-    WHERE OP_UNIQUE_CARRIER IN ('AA', 'DL', 'UA', 'WN')
-      AND CANCELLED = 0
+        GROUP BY OP_UNIQUE_CARRIER
 
-    GROUP BY OP_UNIQUE_CARRIER
+        ORDER BY OP_UNIQUE_CARRIER
+    """)
 
-    ORDER BY OP_UNIQUE_CARRIER
-""")
+    if not benchmark:
+        percentiles.cache()
+        delay_range.cache()
 
-percentiles.cache()
-delay_range.cache()
+    percentile_rows = percentiles.collect()
+    range_rows = delay_range.collect()
 
-percentile_rows = percentiles.collect()
-range_rows = delay_range.collect()
+    elapsed = time.time() - t0
 
-elapsed = time.time() - t0
+    if benchmark:
+        return elapsed
 
-show_dataframe_result(
-    result=percentiles,
-    query_name="Q3 SQL — Percentili DEP_DELAY per compagnia e fascia oraria",
-    elapsed=elapsed,
-    n=100,
-)
+    show_dataframe_result(
+        result=percentiles,
+        query_name="Q3 SQL — Percentili DEP_DELAY per compagnia e fascia oraria",
+        elapsed=elapsed,
+        n=100,
+    )
 
-show_dataframe_result(
-    result=delay_range,
-    query_name="Q3 SQL — Min/Max DEP_DELAY per compagnia",
-    elapsed=elapsed,
-    n=20,
-)
+    show_dataframe_result(
+        result=delay_range,
+        query_name="Q3 SQL — Min/Max DEP_DELAY per compagnia",
+        elapsed=elapsed,
+        n=20,
+    )
 
-save_csv_local(
-    path=LOCAL_OUT_PERCENTILES,
-    result=percentiles,
-    rows=percentile_rows,
-)
+    save_csv_local(
+        path=LOCAL_OUT_PERCENTILES,
+        result=percentiles,
+        rows=percentile_rows,
+    )
 
-save_csv_local(
-    path=LOCAL_OUT_RANGE,
-    result=delay_range,
-    rows=range_rows,
-)
+    save_csv_local(
+        path=LOCAL_OUT_RANGE,
+        result=delay_range,
+        rows=range_rows,
+    )
 
-#Ricordiamo che le query sono separate per più motivi,hanno granularità diverse a livello di order by ed inotre la query dei percentili restituisce 4 (carrier) x 24 (ore del giorno) righe
-#Mentre per il calcolo dei min e max abbiamo bisogno solo di 1 riga per cisascun carrier ovvero 4 righe
-save_dataframe_hdfs(percentiles, HDFS_OUTPUT_PERCENTILES)
-save_dataframe_hdfs(delay_range, HDFS_OUTPUT_RANGE)
+    #Ricordiamo che le query sono separate per più motivi, hanno granularità diverse a livello di order by ed inotre la query dei percentili restituisce 4 (carrier) x 24 (ore del giorno) righe
+    #Mentre per il calcolo dei min e max abbiamo bisogno solo di 1 riga per cisascun carrier ovvero 4 righe
+    save_dataframe_hdfs(percentiles, HDFS_OUTPUT_PERCENTILES)
+    save_dataframe_hdfs(delay_range, HDFS_OUTPUT_RANGE)
 
-print(f"\nTempo Q3 SQL: {elapsed:.2f}s")
-print(f"{'=' * 70}\n")
+    print(f"\nTempo Q3 SQL: {elapsed:.2f}s")
+    print(f"{'=' * 70}\n")
 
-spark.stop()
+    return elapsed
+
+
+def main():
+    spark = build_spark_session(
+        app_name="Q3_SQL_Percentiles",
+        master=SPARK_MASTER,
+    )
+
+    run(spark, benchmark=False)
+
+    spark.stop()
+
+
+if __name__ == "__main__":
+    main()

@@ -12,6 +12,7 @@ def build_spark_session(app_name,master):
         .master(master)
         .config("spark.hadoop.fs.defaultFS", default_fs)
         .config("spark.ui.enabled", "true" if ui_enabled else "false")
+        .config("spark.executorEnv.PYTHONPATH", "/opt/spark/jobs")
     )
     if ui_port is not None:
         builder = builder.config("spark.ui.port", str(ui_port))

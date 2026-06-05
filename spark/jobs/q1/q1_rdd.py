@@ -81,28 +81,15 @@ def finalize(v):
 
     return total, cancelled, cancellation_rate, avg_delay, min_delay, max_delay
 
-def main():
-
-    spark = build_spark_session(
-        app_name="Q1_RDD_AA_DL_monthly_stats",
-        master=SPARK_MASTER,
-        ui_enabled=True,
-        ui_port="4040",
-    )
-
-    # Spark Context
+def run(spark, benchmark=False):
     sc = spark.sparkContext
 
-
     ### Calcolo Q1 con RDD ###
-
-    # Calcolo tempo iniziale
-    t0 = time.time()
 
     # Spark costruisce solo il piano di esecuzione (lineage), trattandosi di Trasformazioni (lazy).
     result_rdd = (
         spark.read.parquet(HDFS_INPUT)
-        .select("OP_UNIQUE_CARRIER", "YEAR", "MONTH", "CANCELLED", "DEP_DELAY") # Leggiamo solo le 5 colonne utili column pruning del Parquet)
+        .select("OP_UNIQUE_CARRIER", "YEAR", "MONTH", "CANCELLED", "DEP_DELAY") # Leggiamo solo le 5 colonne utili (column pruning del Parquet)
         .rdd
         .filter(lambda r: r["OP_UNIQUE_CARRIER"] in ("AA", "DL"))  # solo AA/DL
         .map(to_key_value) # passaggio a struttura (chiave, valore parziale)
@@ -110,15 +97,22 @@ def main():
         .mapValues(finalize) # applicazione funzione di finalizzazione senza modificare le chiavi
     )
 
-    # cache(): chiediamo a Spark di TENERE IN MEMORIA il risultato di questa RDD,
-    # perché lo riutilizzeremo per due azioni consecutive (collect e salvataggio su HDFS).
-    result_rdd.cache()
+    if not benchmark:
+        # cache(): chiediamo a Spark di TENERE IN MEMORIA il risultato di questa RDD,
+        # perché lo riutilizzeremo per due azioni consecutive (collect e salvataggio su HDFS).
+        result_rdd.cache()
+
+    # Calcolo tempo iniziale
+    t0 = time.time()
 
     # Esecuzione
     collected = result_rdd.collect()
 
     # Calcolo tempo trascorso
     elapsed = time.time() - t0
+
+    if benchmark:
+        return elapsed
 
     # (chiave, valore) -> riga piatta, ordinata per (carrier, year, month).
     rows = [
@@ -155,6 +149,18 @@ def main():
         ],
     )
     print(f"{'='*70}\n")
+
+    return elapsed
+
+
+def main():
+
+    spark = build_spark_session(
+        app_name="Q1_RDD_AA_DL_monthly_stats",
+        master=SPARK_MASTER,
+    )
+
+    run(spark, benchmark=False)
 
     if os.getenv("SPARK_DEBUG_UI", "0") == "1":
         print("\nSpark UI attiva. Apri http://localhost:4040 per vedere il DAG.")

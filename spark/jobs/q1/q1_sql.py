@@ -17,13 +17,7 @@ LOCAL_OUT    = "/opt/results/q1_sql.csv"
 os.makedirs(os.path.dirname(LOCAL_OUT), exist_ok=True)
 
 
-def main():
-
-    spark = build_spark_session(
-        app_name="Q1_SQL_AA_DL_monthly_stats",
-        master=SPARK_MASTER,
-    )
-
+def run(spark, benchmark=False):
     # Lettura e registrazione come vista temporanea
     df = spark.read.parquet(HDFS_INPUT)
 
@@ -32,7 +26,6 @@ def main():
     # La TempView è il ponte che collega i due mondi: prende il tuo oggetto DataFrame df (che vive nella memoria del programma Python)
     # e lo espone al parser SQL con un nome interrogabile.
     df.createOrReplaceTempView("flights")
-
 
     ### Calcolo Q1 con Spark SQL
 
@@ -56,14 +49,17 @@ def main():
         ORDER BY OP_UNIQUE_CARRIER, YEAR, MONTH
     """)
 
-    # Caching
-    result.cache()
+    if not benchmark:
+        result.cache()
 
     # Esecuzione
     rows = result.collect()
 
     # Calcolo tempo trascorso
     elapsed = time.time() - t0
+
+    if benchmark:
+        return elapsed
 
     # Output a schermo
     show_dataframe_result(result, "Q1_SQL", elapsed, 20)
@@ -76,6 +72,18 @@ def main():
 
     print(f"\nTempo Q1 (Spark SQL): {elapsed:.2f}s")
     print(f"{'='*70}\n")
+
+    return elapsed
+
+
+def main():
+
+    spark = build_spark_session(
+        app_name="Q1_SQL_AA_DL_monthly_stats",
+        master=SPARK_MASTER,
+    )
+
+    run(spark, benchmark=False)
 
     spark.stop()
 

@@ -34,17 +34,7 @@ HEADER = [
 MIN_FLIGHTS = 500
 TOP_N = 10
 
-#se non c'è cartella out la crea
 os.makedirs(os.path.dirname(LOCAL_OUT), exist_ok=True)
-
-spark = build_spark_session(
-    app_name="Q2_RDD_top10_carriers_arr_delay",
-    master=SPARK_MASTER,
-    ui_enabled=True,
-    ui_port="4040",
-)
-
-sc = spark.sparkContext
 
 
 # Funzioni della pipeline RDD
@@ -88,7 +78,7 @@ def combine(a, b):
 def finalize(v):
     total, arr_sum, arr_n, carrier, weather, nas, security, late = v
 
-    #arr_n rappresenta il numero di voli che hanno effettuatu una tratta valida 
+    #arr_n rappresenta il numero di voli che hanno effettuatu una tratta valida
     avg_arr = round(arr_sum / arr_n, 4) if arr_n > 0 else None
     avg_carrier = round(carrier / arr_n, 4) if arr_n > 0 else None
     avg_weather = round(weather / arr_n, 4) if arr_n > 0 else None
@@ -111,85 +101,107 @@ def top_key(kv):
     avg_arr_delay = kv[1][1]
     return -avg_arr_delay if avg_arr_delay is not None else float("inf")
 
-# Pipeline lazy — nessun calcolo finché non scatta l'action
-# Filtro base sul DataFrame per sfruttare predicate pushdown e column pruning
-# del Parquet; poi passaggio all'RDD.
-base_df = (
-    spark.read.parquet(HDFS_INPUT)
-    .filter((col("CANCELLED") == 0) & (col("DIVERTED") == 0))
-    .select(
-        "OP_UNIQUE_CARRIER",
-        "ARR_DELAY",
-        "CARRIER_DELAY",
-        "WEATHER_DELAY",
-        "NAS_DELAY",
-        "SECURITY_DELAY",
-        "LATE_AIRCRAFT_DELAY",
+
+def run(spark, benchmark=False):
+    sc = spark.sparkContext
+
+    # Pipeline lazy — nessun calcolo finché non scatta l'action
+    # Filtro base sul DataFrame per sfruttare predicate pushdown e column pruning
+    # del Parquet; poi passaggio all'RDD.
+    base_df = (
+        spark.read.parquet(HDFS_INPUT)
+        .filter((col("CANCELLED") == 0) & (col("DIVERTED") == 0))
+        .select(
+            "OP_UNIQUE_CARRIER",
+            "ARR_DELAY",
+            "CARRIER_DELAY",
+            "WEATHER_DELAY",
+            "NAS_DELAY",
+            "SECURITY_DELAY",
+            "LATE_AIRCRAFT_DELAY",
+        )
     )
-)
 
-rdd = (
-    base_df.rdd
-    .map(to_key_value)
-    .reduceByKey(combine)
-    .mapValues(finalize)
-    .filter(lambda kv: kv[1][0] >= MIN_FLIGHTS)
-)
+    rdd = (
+        base_df.rdd
+        .map(to_key_value)
+        .reduceByKey(combine)
+        .mapValues(finalize)
+        .filter(lambda kv: kv[1][0] >= MIN_FLIGHTS)
+    )
 
-# Action: takeOrdered() → calcola direttamente la top-10
-# Questa action fa scattare l'intera pipeline (il peso è lo scan Parquet + lo
-# shuffle di reduceByKey, non il takeOrdered). Rispetto a collect() + sorted(),
-# takeOrdered tiene su ogni partizione solo i TOP_N migliori e li fonde sul
-# driver: in Q2 il risparmio è trascurabile (l'RDD aggregato ha ~15-20 righe),
-# ma è l'analogo RDD di ORDER BY ... LIMIT e resta coerente con DataFrame/SQL.
-t0 = time.time()
+    t0 = time.time()
 
-top = rdd.takeOrdered(
-    TOP_N,
-    key=top_key,
-)
+    # Action: takeOrdered() → calcola direttamente la top-10
+    # Questa action fa scattare l'intera pipeline (il peso è lo scan Parquet + lo
+    # shuffle di reduceByKey, non il takeOrdered). Rispetto a collect() + sorted(),
+    # takeOrdered tiene su ogni partizione solo i TOP_N migliori e li fonde sul
+    # driver: in Q2 il risparmio è trascurabile (l'RDD aggregato ha ~15-20 righe),
+    # ma è l'analogo RDD di ORDER BY ... LIMIT e resta coerente con DataFrame/SQL.
+    top = rdd.takeOrdered(
+        TOP_N,
+        key=top_key,
+    )
 
-elapsed = time.time() - t0
+    elapsed = time.time() - t0
 
-# Versione piatta per stampa e CSV locale.
-rows = [
-    [carrier, *metrics]
-    for carrier, metrics in top
-]
+    if benchmark:
+        return elapsed
 
-# RDD finale piccolo, usato solo per il salvataggio HDFS in stile RDD.
-top_rdd = sc.parallelize(top, numSlices=1)
+    # Versione piatta per stampa e CSV locale.
+    rows = [
+        [carrier, *metrics]
+        for carrier, metrics in top
+    ]
 
-# Output a schermo + CSV locale
-show_rdd_result(
-    rows=rows,
-    header=HEADER,
-    query_name="Q2 RDD",
-    elapsed=elapsed,
-)
+    # RDD finale piccolo, usato solo per il salvataggio HDFS in stile RDD.
+    top_rdd = sc.parallelize(top, numSlices=1)
 
-save_rdd_csv_local(
-    path=LOCAL_OUT,
-    header=HEADER,
-    rows=rows,
-)
+    # Output a schermo + CSV locale
+    show_rdd_result(
+        rows=rows,
+        header=HEADER,
+        query_name="Q2 RDD",
+        elapsed=elapsed,
+    )
 
-# HDFS: salvataggio RDD con saveAsTextFile tramite utility comune
-save_rdd_csv_hdfs(
-    sc=sc,
-    path=HDFS_OUTPUT,
-    header=HEADER,
-    data_rdd=top_rdd,
-    row_mapper=lambda kv: [
-        kv[0],
-        *kv[1],
-    ],
-)
+    save_rdd_csv_local(
+        path=LOCAL_OUT,
+        header=HEADER,
+        rows=rows,
+    )
 
-print(f"{'='*70}\n")
+    # HDFS: salvataggio RDD con saveAsTextFile tramite utility comune
+    save_rdd_csv_hdfs(
+        sc=sc,
+        path=HDFS_OUTPUT,
+        header=HEADER,
+        data_rdd=top_rdd,
+        row_mapper=lambda kv: [
+            kv[0],
+            *kv[1],
+        ],
+    )
 
-if os.getenv("SPARK_DEBUG_UI", "0") == "1":
-    print("\nSpark UI attiva. Apri http://localhost:4040 per vedere il DAG.")
-    input("Premi INVIO per terminare l'applicazione...")
+    print(f"{'='*70}\n")
 
-spark.stop()
+    return elapsed
+
+
+def main():
+    spark = build_spark_session(
+        app_name="Q2_RDD_top10_carriers_arr_delay",
+        master=SPARK_MASTER,
+    )
+
+    run(spark, benchmark=False)
+
+    if os.getenv("SPARK_DEBUG_UI", "0") == "1":
+        print("\nSpark UI attiva. Apri http://localhost:4040 per vedere il DAG.")
+        input("Premi INVIO per terminare l'applicazione...")
+
+    spark.stop()
+
+
+if __name__ == "__main__":
+    main()

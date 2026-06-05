@@ -21,89 +21,103 @@ LOCAL_OUT = "/opt/results"
 
 os.makedirs(LOCAL_OUT, exist_ok=True)
 
-spark = build_spark_session(
-    app_name="Q3_Percentiles_by_Hour",
-    master=SPARK_MASTER,
-)
 
-df = (
-    spark.read.parquet(HDFS_INPUT)
-    .filter(
-        (col("OP_UNIQUE_CARRIER").isin("AA", "DL", "UA", "WN")) &
-        (col("CANCELLED") == 0)
+def run(spark, benchmark=False):
+    df = (
+        spark.read.parquet(HDFS_INPUT)
+        .filter(
+            (col("OP_UNIQUE_CARRIER").isin("AA", "DL", "UA", "WN")) &
+            (col("CANCELLED") == 0)
+        )
+        .withColumn("hour", floor(col("CRS_DEP_TIME") / 100))
+        #crea una nuova colonna con alias hour
     )
-    .withColumn("hour", floor(col("CRS_DEP_TIME") / 100))
-    #crea una nuova colonna con alias hour
-)
-# Calcolo Percentili
 
-t0 = time.time()
+    # Calcolo Percentili
+    t0 = time.time()
 
-#calcolo percentili sempre tramite percentile_approx, efficiente
-percentiles = (
-    df.groupBy("OP_UNIQUE_CARRIER", "hour")
-    .agg(
-        expr("percentile_approx(DEP_DELAY, 0.25)").alias("p25"),
-        expr("percentile_approx(DEP_DELAY, 0.50)").alias("p50"),
-        expr("percentile_approx(DEP_DELAY, 0.75)").alias("p75"),
-        expr("percentile_approx(DEP_DELAY, 0.90)").alias("p90"),
+    #calcolo percentili sempre tramite percentile_approx, efficiente
+    percentiles = (
+        df.groupBy("OP_UNIQUE_CARRIER", "hour")
+        .agg(
+            expr("percentile_approx(DEP_DELAY, 0.25)").alias("p25"),
+            expr("percentile_approx(DEP_DELAY, 0.50)").alias("p50"),
+            expr("percentile_approx(DEP_DELAY, 0.75)").alias("p75"),
+            expr("percentile_approx(DEP_DELAY, 0.90)").alias("p90"),
+        )
+        .orderBy("OP_UNIQUE_CARRIER", "hour")
     )
-    .orderBy("OP_UNIQUE_CARRIER", "hour")
-)
 
-#Query separata per il calcolo di minimo e massimo come negli altri casi, abbiamo un livello di granularità diverso sul group by ed inoltre una cardinalità differente nei risultati
-delay_range = (
-    df.groupBy("OP_UNIQUE_CARRIER")
-    .agg(
-        spark_min("DEP_DELAY").alias("min_delay"),
-        spark_max("DEP_DELAY").alias("max_delay"),
+    #Query separata per il calcolo di minimo e massimo come negli altri casi, abbiamo un livello di granularità diverso sul group by ed inoltre una cardinalità differente nei risultati
+    delay_range = (
+        df.groupBy("OP_UNIQUE_CARRIER")
+        .agg(
+            spark_min("DEP_DELAY").alias("min_delay"),
+            spark_max("DEP_DELAY").alias("max_delay"),
+        )
+        .orderBy("OP_UNIQUE_CARRIER")
     )
-    .orderBy("OP_UNIQUE_CARRIER")
-)
 
-#caching per evitarne il ricalcolo
-percentiles.cache()
-delay_range.cache()
+    if not benchmark:
+        #caching per evitarne il ricalcolo
+        percentiles.cache()
+        delay_range.cache()
 
-percentile_rows = percentiles.collect()
-range_rows = delay_range.collect()
-elapsed = time.time() - t0
+    percentile_rows = percentiles.collect()
+    range_rows = delay_range.collect()
+    elapsed = time.time() - t0
 
-# Output a schermo
+    if benchmark:
+        return elapsed
 
-show_dataframe_result(
-    result=percentiles,
-    query_name="Q3 — Percentili DEP_DELAY per compagnia e fascia oraria",
-    elapsed=elapsed,
-    n=100,
-)
+    # Output a schermo
+    show_dataframe_result(
+        result=percentiles,
+        query_name="Q3 — Percentili DEP_DELAY per compagnia e fascia oraria",
+        elapsed=elapsed,
+        n=100,
+    )
 
-show_dataframe_result(
-    result=delay_range,
-    query_name="Q3 — Min/Max DEP_DELAY per compagnia",
-    elapsed=elapsed,
-    n=20,
-)
+    show_dataframe_result(
+        result=delay_range,
+        query_name="Q3 — Min/Max DEP_DELAY per compagnia",
+        elapsed=elapsed,
+        n=20,
+    )
 
-# Salvataggio CSV
+    # Salvataggio CSV
+    save_csv_local(
+        path=LOCAL_OUT_PERCENTILES,
+        result=percentiles,
+        rows=percentile_rows,
+    )
 
-save_csv_local(
-    path=LOCAL_OUT_PERCENTILES,
-    result=percentiles,
-    rows=percentile_rows,
-)
+    save_csv_local(
+        path=LOCAL_OUT_RANGE,
+        result=delay_range,
+        rows=range_rows,
+    )
 
-save_csv_local(
-    path=LOCAL_OUT_RANGE,
-    result=delay_range,
-    rows=range_rows,
-)
+    #Salvataggio anche in remoto su hdfs
+    save_dataframe_hdfs(percentiles, HDFS_OUTPUT_PERCENTILES)
+    save_dataframe_hdfs(delay_range, HDFS_OUTPUT_RANGE)
 
-#Salvataggio anche in remoto su hdfs
-save_dataframe_hdfs(percentiles, HDFS_OUTPUT_PERCENTILES)
-save_dataframe_hdfs(delay_range, HDFS_OUTPUT_RANGE)
+    print(f"\nTempo Q3: {elapsed:.2f}s")
+    print(f"{'=' * 70}\n")
 
-print(f"\nTempo Q3: {elapsed:.2f}s")
-print(f"{'=' * 70}\n")
+    return elapsed
 
-spark.stop()
+
+def main():
+    spark = build_spark_session(
+        app_name="Q3_Percentiles_by_Hour",
+        master=SPARK_MASTER,
+    )
+
+    run(spark, benchmark=False)
+
+    spark.stop()
+
+
+if __name__ == "__main__":
+    main()
