@@ -17,7 +17,6 @@ HDFS_RESULTS    = "hdfs://namenode:9000/sabd/results"
 Q1_PATH         = f"{HDFS_RESULTS}/q1_rdd"
 Q2_PATH         = f"{HDFS_RESULTS}/q2_rdd"
 Q3_PCT_PATH     = f"{HDFS_RESULTS}/q3_rdd/percentiles"
-Q3_RNG_PATH     = f"{HDFS_RESULTS}/q3_rdd/delay_range"
 CLUSTERING_PATH = f"{HDFS_RESULTS}/clustering_base"
 
 # Schema dei CSV RDD su HDFS (gli output saveAsTextFile non hanno un header
@@ -27,8 +26,6 @@ COLS_Q1     = ["OP_UNIQUE_CARRIER", "YEAR", "MONTH", "total_flights","cancelled_
 COLS_Q2     = ["OP_UNIQUE_CARRIER", "num_flights", "avg_arr_delay","avg_carrier_delay", "avg_weather_delay", "avg_nas_delay","avg_security_delay", "avg_late_aircraft_delay"]
 
 COLS_Q3_PCT = ["OP_UNIQUE_CARRIER", "hour", "p25", "p50", "p75", "p90"]
-
-COLS_Q3_RNG = ["OP_UNIQUE_CARRIER", "min_delay", "max_delay"]
 
 MONTH_LABELS = {"1": "Jan", "2": "Feb", "3": "Mar", "4": "Apr"}
 
@@ -124,7 +121,7 @@ def export_q2(r: redis.Redis, rows: list[dict]) -> int:
 
 # Q3
 
-def export_q3(r: redis.Redis, pct_rows: list[dict], rng_rows: list[dict]) -> tuple[int, int]:
+def export_q3(r: redis.Redis, pct_rows: list[dict]) -> int:
     pct_written = 0
     for row in pct_rows:
         carrier = row["OP_UNIQUE_CARRIER"]
@@ -137,35 +134,11 @@ def export_q3(r: redis.Redis, pct_rows: list[dict], rng_rows: list[dict]) -> tup
             "p90": row["p90"],
         })
         pct_written += 1
-
-    rng_written = 0
-    for row in rng_rows:
-        carrier = row["OP_UNIQUE_CARRIER"]
-        r.hset(f"q3:range:{carrier}", mapping={
-            "min_delay": row["min_delay"],
-            "max_delay": row["max_delay"],
-        })
-        rng_written += 1
-
-    #due hash separati sempre stesso discorso, in uno i percentili nell'altro i min/max
-
-    return pct_written, rng_written
+    return pct_written
 
 
 def export_grafana_viz(r: redis.Redis, q1_rows: list[dict], q2_rows: list[dict],
                        q3_pct_rows: list[dict]) -> None:
-
-    # Q1
-    if q1_rows:
-        # Inseriamo i field in ordine di mese: Redis conserva l'ordine d'inserimento
-        # per gli hash piccoli (listpack), così HGETALL li ritorna Jan→Apr e il
-        # barchart Grafana mostra i mesi in ordine cronologico senza sort esplicito.
-        for row in sorted(q1_rows, key=lambda x: int(x["MONTH"])):
-            carrier = row["OP_UNIQUE_CARRIER"]
-            month   = MONTH_LABELS.get(row["MONTH"], row["MONTH"])
-            r.hset(f"q1:viz:{carrier}:avg_dep_delay",     month, row["avg_dep_delay"])
-            r.hset(f"q1:viz:{carrier}:cancellation_rate", month, row["cancellation_rate_pct"])
-        print("  Q1 viz: q1:viz:{carrier}:avg_dep_delay  |  q1:viz:{carrier}:cancellation_rate")
 
     # Q2
     components = [
@@ -238,7 +211,6 @@ def main():
         q1_rows     = read_csv(spark, Q1_PATH, COLS_Q1)
         q2_rows     = read_csv(spark, Q2_PATH, COLS_Q2)
         q3_pct_rows = read_csv(spark, Q3_PCT_PATH, COLS_Q3_PCT)
-        q3_rng_rows = read_csv(spark, Q3_RNG_PATH, COLS_Q3_RNG)
         clust_rows  = read_csv(spark, CLUSTERING_PATH)   # header DataFrame affidabile
 
         n = export_q1(r, q1_rows)
@@ -247,8 +219,8 @@ def main():
         n = export_q2(r, q2_rows)
         print(f"Q2: {n} carriers written  (q2:ranking ZSET + q2:{{carrier}} HASHes)")
 
-        pct, rng = export_q3(r, q3_pct_rows, q3_rng_rows)
-        print(f"Q3: {pct} percentile keys + {rng} range keys written")
+        pct = export_q3(r, q3_pct_rows)
+        print(f"Q3: {pct} percentile keys written")
 
         print("\n── Grafana viz keys ")
         export_grafana_viz(r, q1_rows, q2_rows, q3_pct_rows)
@@ -267,12 +239,6 @@ def main():
 
         sample_pct = r.hgetall("q3:percentiles:AA:8")
         print(f"q3:percentiles:AA:8  →  {sample_pct}")
-
-        sample_rng = r.hgetall("q3:range:AA")
-        print(f"q3:range:AA  →  {sample_rng}")
-
-        viz_q1 = r.hgetall("q1:viz:AA:avg_dep_delay")
-        print(f"q1:viz:AA:avg_dep_delay  →  {viz_q1}")
 
         viz_q3 = r.hgetall("q3:viz:AA:p50")
         print(f"q3:viz:AA:p50 (first 5 hours)  →  { {k: viz_q3[k] for k in sorted(viz_q3)[:5]} }")

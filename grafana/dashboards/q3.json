@@ -2,549 +2,209 @@
   "id": null,
   "uid": "sabd-q3",
   "title": "Q3 \u2014 DEP_DELAY Percentiles by Hour",
-  "tags": [
-    "sabd",
-    "q3"
-  ],
+  "tags": ["sabd", "q3"],
   "schemaVersion": 38,
-  "version": 3,
+  "version": 4,
   "refresh": false,
-  "time": {
-    "from": "now-1h",
-    "to": "now"
-  },
-  "timepicker": {
-    "hidden": true
-  },
+  "time": {"from": "now-1h", "to": "now"},
+  "timepicker": {"hidden": true},
   "panels": [
+
     {
-      "id": 1,
-      "title": "AA \u2014 DEP_DELAY Percentiles by Hour",
-      "description": "p25/p50/p75/p90 di DEP_DELAY per fascia oraria \u2014 AA.",
-      "type": "barchart",
-      "gridPos": {
-        "h": 12,
-        "w": 12,
-        "x": 0,
-        "y": 0
-      },
-      "datasource": {
-        "type": "redis-datasource",
-        "uid": "redis"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "decimals": 2,
-          "color": {
-            "mode": "palette-classic"
-          }
-        },
-        "overrides": [
-          {
-            "matcher": { "id": "byFrameRefID", "options": "A" },
-            "properties": [ { "id": "displayName", "value": "p25" } ]
-          },
-          {
-            "matcher": { "id": "byFrameRefID", "options": "B" },
-            "properties": [ { "id": "displayName", "value": "p50" } ]
-          },
-          {
-            "matcher": { "id": "byFrameRefID", "options": "C" },
-            "properties": [ { "id": "displayName", "value": "p75" } ]
-          },
-          {
-            "matcher": { "id": "byFrameRefID", "options": "D" },
-            "properties": [ { "id": "displayName", "value": "p90" } ]
-          }
-        ]
-      },
-      "options": {
-        "xField": "Hour",
-        "orientation": "auto",
-        "fillOpacity": 80,
-        "gradientMode": "none",
-        "groupWidth": 0.7,
-        "barWidth": 0.97,
-        "tooltip": {
-          "mode": "multi",
-          "sort": "none"
-        },
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        }
-      },
+      "id": 1, "title": "AA \u2014 p25 by Hour", "type": "barchart",
+      "gridPos": {"h": 8, "w": 6, "x": 0, "y": 0},
+      "datasource": {"type": "redis-datasource", "uid": "redis"},
+      "fieldConfig": {"defaults": {"unit": "short", "decimals": 2, "color": {"mode": "fixed", "fixedColor": "blue"}}, "overrides": []},
+      "options": {"xField": "Field", "orientation": "vertical", "fillOpacity": 80, "gradientMode": "none", "tooltip": {"mode": "single"}, "legend": {"displayMode": "list", "placement": "bottom", "showLegend": false}},
       "transformations": [
-        {
-          "id": "reduce",
-          "options": {
-            "reducers": [
-              "last"
-            ],
-            "labelsToFields": false
-          }
-        },
-        {
-          "id": "organize",
-          "options": {
-            "renameByName": {
-              "Field": "Hour"
-            }
-          }
-        }
+        {"id": "reduce", "options": {"reducers": ["last"], "labelsToFields": false}},
+        {"id": "organize", "options": {"renameByName": {"Last": "p25"}}}
       ],
-      "targets": [
-        {
-          "datasource": {
-            "type": "redis-datasource",
-            "uid": "redis"
-          },
-          "refId": "A",
-          "command": "hgetall",
-          "keyName": "q3:viz:AA:p25"
-        },
-        {
-          "datasource": {
-            "type": "redis-datasource",
-            "uid": "redis"
-          },
-          "refId": "B",
-          "command": "hgetall",
-          "keyName": "q3:viz:AA:p50"
-        },
-        {
-          "datasource": {
-            "type": "redis-datasource",
-            "uid": "redis"
-          },
-          "refId": "C",
-          "command": "hgetall",
-          "keyName": "q3:viz:AA:p75"
-        },
-        {
-          "datasource": {
-            "type": "redis-datasource",
-            "uid": "redis"
-          },
-          "refId": "D",
-          "command": "hgetall",
-          "keyName": "q3:viz:AA:p90"
-        }
-      ]
+      "targets": [{"datasource": {"type": "redis-datasource", "uid": "redis"}, "refId": "A", "command": "hgetall", "keyName": "q3:viz:AA:p25"}]
     },
     {
-      "id": 2,
-      "title": "DL \u2014 DEP_DELAY Percentiles by Hour",
-      "description": "p25/p50/p75/p90 di DEP_DELAY per fascia oraria \u2014 DL.",
-      "type": "barchart",
-      "gridPos": {
-        "h": 12,
-        "w": 12,
-        "x": 12,
-        "y": 0
-      },
-      "datasource": {
-        "type": "redis-datasource",
-        "uid": "redis"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "decimals": 2,
-          "color": {
-            "mode": "palette-classic"
-          }
-        },
-        "overrides": [
-          {
-            "matcher": { "id": "byFrameRefID", "options": "A" },
-            "properties": [ { "id": "displayName", "value": "p25" } ]
-          },
-          {
-            "matcher": { "id": "byFrameRefID", "options": "B" },
-            "properties": [ { "id": "displayName", "value": "p50" } ]
-          },
-          {
-            "matcher": { "id": "byFrameRefID", "options": "C" },
-            "properties": [ { "id": "displayName", "value": "p75" } ]
-          },
-          {
-            "matcher": { "id": "byFrameRefID", "options": "D" },
-            "properties": [ { "id": "displayName", "value": "p90" } ]
-          }
-        ]
-      },
-      "options": {
-        "xField": "Hour",
-        "orientation": "auto",
-        "fillOpacity": 80,
-        "gradientMode": "none",
-        "groupWidth": 0.7,
-        "barWidth": 0.97,
-        "tooltip": {
-          "mode": "multi",
-          "sort": "none"
-        },
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        }
-      },
+      "id": 2, "title": "AA \u2014 p50 by Hour", "type": "barchart",
+      "gridPos": {"h": 8, "w": 6, "x": 6, "y": 0},
+      "datasource": {"type": "redis-datasource", "uid": "redis"},
+      "fieldConfig": {"defaults": {"unit": "short", "decimals": 2, "color": {"mode": "fixed", "fixedColor": "green"}}, "overrides": []},
+      "options": {"xField": "Field", "orientation": "vertical", "fillOpacity": 80, "gradientMode": "none", "tooltip": {"mode": "single"}, "legend": {"displayMode": "list", "placement": "bottom", "showLegend": false}},
       "transformations": [
-        {
-          "id": "reduce",
-          "options": {
-            "reducers": [
-              "last"
-            ],
-            "labelsToFields": false
-          }
-        },
-        {
-          "id": "organize",
-          "options": {
-            "renameByName": {
-              "Field": "Hour"
-            }
-          }
-        }
+        {"id": "reduce", "options": {"reducers": ["last"], "labelsToFields": false}},
+        {"id": "organize", "options": {"renameByName": {"Last": "p50"}}}
       ],
-      "targets": [
-        {
-          "datasource": {
-            "type": "redis-datasource",
-            "uid": "redis"
-          },
-          "refId": "A",
-          "command": "hgetall",
-          "keyName": "q3:viz:DL:p25"
-        },
-        {
-          "datasource": {
-            "type": "redis-datasource",
-            "uid": "redis"
-          },
-          "refId": "B",
-          "command": "hgetall",
-          "keyName": "q3:viz:DL:p50"
-        },
-        {
-          "datasource": {
-            "type": "redis-datasource",
-            "uid": "redis"
-          },
-          "refId": "C",
-          "command": "hgetall",
-          "keyName": "q3:viz:DL:p75"
-        },
-        {
-          "datasource": {
-            "type": "redis-datasource",
-            "uid": "redis"
-          },
-          "refId": "D",
-          "command": "hgetall",
-          "keyName": "q3:viz:DL:p90"
-        }
-      ]
+      "targets": [{"datasource": {"type": "redis-datasource", "uid": "redis"}, "refId": "A", "command": "hgetall", "keyName": "q3:viz:AA:p50"}]
     },
     {
-      "id": 3,
-      "title": "UA \u2014 DEP_DELAY Percentiles by Hour",
-      "description": "p25/p50/p75/p90 di DEP_DELAY per fascia oraria \u2014 UA.",
-      "type": "barchart",
-      "gridPos": {
-        "h": 12,
-        "w": 12,
-        "x": 0,
-        "y": 12
-      },
-      "datasource": {
-        "type": "redis-datasource",
-        "uid": "redis"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "decimals": 2,
-          "color": {
-            "mode": "palette-classic"
-          }
-        },
-        "overrides": [
-          {
-            "matcher": { "id": "byFrameRefID", "options": "A" },
-            "properties": [ { "id": "displayName", "value": "p25" } ]
-          },
-          {
-            "matcher": { "id": "byFrameRefID", "options": "B" },
-            "properties": [ { "id": "displayName", "value": "p50" } ]
-          },
-          {
-            "matcher": { "id": "byFrameRefID", "options": "C" },
-            "properties": [ { "id": "displayName", "value": "p75" } ]
-          },
-          {
-            "matcher": { "id": "byFrameRefID", "options": "D" },
-            "properties": [ { "id": "displayName", "value": "p90" } ]
-          }
-        ]
-      },
-      "options": {
-        "xField": "Hour",
-        "orientation": "auto",
-        "fillOpacity": 80,
-        "gradientMode": "none",
-        "groupWidth": 0.7,
-        "barWidth": 0.97,
-        "tooltip": {
-          "mode": "multi",
-          "sort": "none"
-        },
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        }
-      },
+      "id": 3, "title": "AA \u2014 p75 by Hour", "type": "barchart",
+      "gridPos": {"h": 8, "w": 6, "x": 12, "y": 0},
+      "datasource": {"type": "redis-datasource", "uid": "redis"},
+      "fieldConfig": {"defaults": {"unit": "short", "decimals": 2, "color": {"mode": "fixed", "fixedColor": "orange"}}, "overrides": []},
+      "options": {"xField": "Field", "orientation": "vertical", "fillOpacity": 80, "gradientMode": "none", "tooltip": {"mode": "single"}, "legend": {"displayMode": "list", "placement": "bottom", "showLegend": false}},
       "transformations": [
-        {
-          "id": "reduce",
-          "options": {
-            "reducers": [
-              "last"
-            ],
-            "labelsToFields": false
-          }
-        },
-        {
-          "id": "organize",
-          "options": {
-            "renameByName": {
-              "Field": "Hour"
-            }
-          }
-        }
+        {"id": "reduce", "options": {"reducers": ["last"], "labelsToFields": false}},
+        {"id": "organize", "options": {"renameByName": {"Last": "p75"}}}
       ],
-      "targets": [
-        {
-          "datasource": {
-            "type": "redis-datasource",
-            "uid": "redis"
-          },
-          "refId": "A",
-          "command": "hgetall",
-          "keyName": "q3:viz:UA:p25"
-        },
-        {
-          "datasource": {
-            "type": "redis-datasource",
-            "uid": "redis"
-          },
-          "refId": "B",
-          "command": "hgetall",
-          "keyName": "q3:viz:UA:p50"
-        },
-        {
-          "datasource": {
-            "type": "redis-datasource",
-            "uid": "redis"
-          },
-          "refId": "C",
-          "command": "hgetall",
-          "keyName": "q3:viz:UA:p75"
-        },
-        {
-          "datasource": {
-            "type": "redis-datasource",
-            "uid": "redis"
-          },
-          "refId": "D",
-          "command": "hgetall",
-          "keyName": "q3:viz:UA:p90"
-        }
-      ]
+      "targets": [{"datasource": {"type": "redis-datasource", "uid": "redis"}, "refId": "A", "command": "hgetall", "keyName": "q3:viz:AA:p75"}]
     },
     {
-      "id": 4,
-      "title": "WN \u2014 DEP_DELAY Percentiles by Hour",
-      "description": "p25/p50/p75/p90 di DEP_DELAY per fascia oraria \u2014 WN.",
-      "type": "barchart",
-      "gridPos": {
-        "h": 12,
-        "w": 12,
-        "x": 12,
-        "y": 12
-      },
-      "datasource": {
-        "type": "redis-datasource",
-        "uid": "redis"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "decimals": 2,
-          "color": {
-            "mode": "palette-classic"
-          }
-        },
-        "overrides": [
-          {
-            "matcher": { "id": "byFrameRefID", "options": "A" },
-            "properties": [ { "id": "displayName", "value": "p25" } ]
-          },
-          {
-            "matcher": { "id": "byFrameRefID", "options": "B" },
-            "properties": [ { "id": "displayName", "value": "p50" } ]
-          },
-          {
-            "matcher": { "id": "byFrameRefID", "options": "C" },
-            "properties": [ { "id": "displayName", "value": "p75" } ]
-          },
-          {
-            "matcher": { "id": "byFrameRefID", "options": "D" },
-            "properties": [ { "id": "displayName", "value": "p90" } ]
-          }
-        ]
-      },
-      "options": {
-        "xField": "Hour",
-        "orientation": "auto",
-        "fillOpacity": 80,
-        "gradientMode": "none",
-        "groupWidth": 0.7,
-        "barWidth": 0.97,
-        "tooltip": {
-          "mode": "multi",
-          "sort": "none"
-        },
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        }
-      },
+      "id": 4, "title": "AA \u2014 p90 by Hour", "type": "barchart",
+      "gridPos": {"h": 8, "w": 6, "x": 18, "y": 0},
+      "datasource": {"type": "redis-datasource", "uid": "redis"},
+      "fieldConfig": {"defaults": {"unit": "short", "decimals": 2, "color": {"mode": "fixed", "fixedColor": "red"}}, "overrides": []},
+      "options": {"xField": "Field", "orientation": "vertical", "fillOpacity": 80, "gradientMode": "none", "tooltip": {"mode": "single"}, "legend": {"displayMode": "list", "placement": "bottom", "showLegend": false}},
       "transformations": [
-        {
-          "id": "reduce",
-          "options": {
-            "reducers": [
-              "last"
-            ],
-            "labelsToFields": false
-          }
-        },
-        {
-          "id": "organize",
-          "options": {
-            "renameByName": {
-              "Field": "Hour"
-            }
-          }
-        }
+        {"id": "reduce", "options": {"reducers": ["last"], "labelsToFields": false}},
+        {"id": "organize", "options": {"renameByName": {"Last": "p90"}}}
       ],
-      "targets": [
-        {
-          "datasource": {
-            "type": "redis-datasource",
-            "uid": "redis"
-          },
-          "refId": "A",
-          "command": "hgetall",
-          "keyName": "q3:viz:WN:p25"
-        },
-        {
-          "datasource": {
-            "type": "redis-datasource",
-            "uid": "redis"
-          },
-          "refId": "B",
-          "command": "hgetall",
-          "keyName": "q3:viz:WN:p50"
-        },
-        {
-          "datasource": {
-            "type": "redis-datasource",
-            "uid": "redis"
-          },
-          "refId": "C",
-          "command": "hgetall",
-          "keyName": "q3:viz:WN:p75"
-        },
-        {
-          "datasource": {
-            "type": "redis-datasource",
-            "uid": "redis"
-          },
-          "refId": "D",
-          "command": "hgetall",
-          "keyName": "q3:viz:WN:p90"
-        }
-      ]
+      "targets": [{"datasource": {"type": "redis-datasource", "uid": "redis"}, "refId": "A", "command": "hgetall", "keyName": "q3:viz:AA:p90"}]
+    },
+
+    {
+      "id": 5, "title": "DL \u2014 p25 by Hour", "type": "barchart",
+      "gridPos": {"h": 8, "w": 6, "x": 0, "y": 8},
+      "datasource": {"type": "redis-datasource", "uid": "redis"},
+      "fieldConfig": {"defaults": {"unit": "short", "decimals": 2, "color": {"mode": "fixed", "fixedColor": "blue"}}, "overrides": []},
+      "options": {"xField": "Field", "orientation": "vertical", "fillOpacity": 80, "gradientMode": "none", "tooltip": {"mode": "single"}, "legend": {"displayMode": "list", "placement": "bottom", "showLegend": false}},
+      "transformations": [
+        {"id": "reduce", "options": {"reducers": ["last"], "labelsToFields": false}},
+        {"id": "organize", "options": {"renameByName": {"Last": "p25"}}}
+      ],
+      "targets": [{"datasource": {"type": "redis-datasource", "uid": "redis"}, "refId": "A", "command": "hgetall", "keyName": "q3:viz:DL:p25"}]
     },
     {
-      "id": 5,
-      "title": "Min / Max DEP_DELAY per Carrier",
-      "type": "table",
-      "gridPos": {
-        "h": 6,
-        "w": 24,
-        "x": 0,
-        "y": 24
-      },
-      "datasource": {
-        "type": "redis-datasource",
-        "uid": "redis"
-      },
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": []
-      },
-      "options": {
-        "showHeader": true
-      },
-      "transformations": [],
-      "targets": [
-        {
-          "datasource": {
-            "type": "redis-datasource",
-            "uid": "redis"
-          },
-          "refId": "AA",
-          "command": "hgetall",
-          "keyName": "q3:range:AA"
-        },
-        {
-          "datasource": {
-            "type": "redis-datasource",
-            "uid": "redis"
-          },
-          "refId": "DL",
-          "command": "hgetall",
-          "keyName": "q3:range:DL"
-        },
-        {
-          "datasource": {
-            "type": "redis-datasource",
-            "uid": "redis"
-          },
-          "refId": "UA",
-          "command": "hgetall",
-          "keyName": "q3:range:UA"
-        },
-        {
-          "datasource": {
-            "type": "redis-datasource",
-            "uid": "redis"
-          },
-          "refId": "WN",
-          "command": "hgetall",
-          "keyName": "q3:range:WN"
-        }
-      ]
+      "id": 6, "title": "DL \u2014 p50 by Hour", "type": "barchart",
+      "gridPos": {"h": 8, "w": 6, "x": 6, "y": 8},
+      "datasource": {"type": "redis-datasource", "uid": "redis"},
+      "fieldConfig": {"defaults": {"unit": "short", "decimals": 2, "color": {"mode": "fixed", "fixedColor": "green"}}, "overrides": []},
+      "options": {"xField": "Field", "orientation": "vertical", "fillOpacity": 80, "gradientMode": "none", "tooltip": {"mode": "single"}, "legend": {"displayMode": "list", "placement": "bottom", "showLegend": false}},
+      "transformations": [
+        {"id": "reduce", "options": {"reducers": ["last"], "labelsToFields": false}},
+        {"id": "organize", "options": {"renameByName": {"Last": "p50"}}}
+      ],
+      "targets": [{"datasource": {"type": "redis-datasource", "uid": "redis"}, "refId": "A", "command": "hgetall", "keyName": "q3:viz:DL:p50"}]
+    },
+    {
+      "id": 7, "title": "DL \u2014 p75 by Hour", "type": "barchart",
+      "gridPos": {"h": 8, "w": 6, "x": 12, "y": 8},
+      "datasource": {"type": "redis-datasource", "uid": "redis"},
+      "fieldConfig": {"defaults": {"unit": "short", "decimals": 2, "color": {"mode": "fixed", "fixedColor": "orange"}}, "overrides": []},
+      "options": {"xField": "Field", "orientation": "vertical", "fillOpacity": 80, "gradientMode": "none", "tooltip": {"mode": "single"}, "legend": {"displayMode": "list", "placement": "bottom", "showLegend": false}},
+      "transformations": [
+        {"id": "reduce", "options": {"reducers": ["last"], "labelsToFields": false}},
+        {"id": "organize", "options": {"renameByName": {"Last": "p75"}}}
+      ],
+      "targets": [{"datasource": {"type": "redis-datasource", "uid": "redis"}, "refId": "A", "command": "hgetall", "keyName": "q3:viz:DL:p75"}]
+    },
+    {
+      "id": 8, "title": "DL \u2014 p90 by Hour", "type": "barchart",
+      "gridPos": {"h": 8, "w": 6, "x": 18, "y": 8},
+      "datasource": {"type": "redis-datasource", "uid": "redis"},
+      "fieldConfig": {"defaults": {"unit": "short", "decimals": 2, "color": {"mode": "fixed", "fixedColor": "red"}}, "overrides": []},
+      "options": {"xField": "Field", "orientation": "vertical", "fillOpacity": 80, "gradientMode": "none", "tooltip": {"mode": "single"}, "legend": {"displayMode": "list", "placement": "bottom", "showLegend": false}},
+      "transformations": [
+        {"id": "reduce", "options": {"reducers": ["last"], "labelsToFields": false}},
+        {"id": "organize", "options": {"renameByName": {"Last": "p90"}}}
+      ],
+      "targets": [{"datasource": {"type": "redis-datasource", "uid": "redis"}, "refId": "A", "command": "hgetall", "keyName": "q3:viz:DL:p90"}]
+    },
+
+    {
+      "id": 9, "title": "UA \u2014 p25 by Hour", "type": "barchart",
+      "gridPos": {"h": 8, "w": 6, "x": 0, "y": 16},
+      "datasource": {"type": "redis-datasource", "uid": "redis"},
+      "fieldConfig": {"defaults": {"unit": "short", "decimals": 2, "color": {"mode": "fixed", "fixedColor": "blue"}}, "overrides": []},
+      "options": {"xField": "Field", "orientation": "vertical", "fillOpacity": 80, "gradientMode": "none", "tooltip": {"mode": "single"}, "legend": {"displayMode": "list", "placement": "bottom", "showLegend": false}},
+      "transformations": [
+        {"id": "reduce", "options": {"reducers": ["last"], "labelsToFields": false}},
+        {"id": "organize", "options": {"renameByName": {"Last": "p25"}}}
+      ],
+      "targets": [{"datasource": {"type": "redis-datasource", "uid": "redis"}, "refId": "A", "command": "hgetall", "keyName": "q3:viz:UA:p25"}]
+    },
+    {
+      "id": 10, "title": "UA \u2014 p50 by Hour", "type": "barchart",
+      "gridPos": {"h": 8, "w": 6, "x": 6, "y": 16},
+      "datasource": {"type": "redis-datasource", "uid": "redis"},
+      "fieldConfig": {"defaults": {"unit": "short", "decimals": 2, "color": {"mode": "fixed", "fixedColor": "green"}}, "overrides": []},
+      "options": {"xField": "Field", "orientation": "vertical", "fillOpacity": 80, "gradientMode": "none", "tooltip": {"mode": "single"}, "legend": {"displayMode": "list", "placement": "bottom", "showLegend": false}},
+      "transformations": [
+        {"id": "reduce", "options": {"reducers": ["last"], "labelsToFields": false}},
+        {"id": "organize", "options": {"renameByName": {"Last": "p50"}}}
+      ],
+      "targets": [{"datasource": {"type": "redis-datasource", "uid": "redis"}, "refId": "A", "command": "hgetall", "keyName": "q3:viz:UA:p50"}]
+    },
+    {
+      "id": 11, "title": "UA \u2014 p75 by Hour", "type": "barchart",
+      "gridPos": {"h": 8, "w": 6, "x": 12, "y": 16},
+      "datasource": {"type": "redis-datasource", "uid": "redis"},
+      "fieldConfig": {"defaults": {"unit": "short", "decimals": 2, "color": {"mode": "fixed", "fixedColor": "orange"}}, "overrides": []},
+      "options": {"xField": "Field", "orientation": "vertical", "fillOpacity": 80, "gradientMode": "none", "tooltip": {"mode": "single"}, "legend": {"displayMode": "list", "placement": "bottom", "showLegend": false}},
+      "transformations": [
+        {"id": "reduce", "options": {"reducers": ["last"], "labelsToFields": false}},
+        {"id": "organize", "options": {"renameByName": {"Last": "p75"}}}
+      ],
+      "targets": [{"datasource": {"type": "redis-datasource", "uid": "redis"}, "refId": "A", "command": "hgetall", "keyName": "q3:viz:UA:p75"}]
+    },
+    {
+      "id": 12, "title": "UA \u2014 p90 by Hour", "type": "barchart",
+      "gridPos": {"h": 8, "w": 6, "x": 18, "y": 16},
+      "datasource": {"type": "redis-datasource", "uid": "redis"},
+      "fieldConfig": {"defaults": {"unit": "short", "decimals": 2, "color": {"mode": "fixed", "fixedColor": "red"}}, "overrides": []},
+      "options": {"xField": "Field", "orientation": "vertical", "fillOpacity": 80, "gradientMode": "none", "tooltip": {"mode": "single"}, "legend": {"displayMode": "list", "placement": "bottom", "showLegend": false}},
+      "transformations": [
+        {"id": "reduce", "options": {"reducers": ["last"], "labelsToFields": false}},
+        {"id": "organize", "options": {"renameByName": {"Last": "p90"}}}
+      ],
+      "targets": [{"datasource": {"type": "redis-datasource", "uid": "redis"}, "refId": "A", "command": "hgetall", "keyName": "q3:viz:UA:p90"}]
+    },
+
+    {
+      "id": 13, "title": "WN \u2014 p25 by Hour", "type": "barchart",
+      "gridPos": {"h": 8, "w": 6, "x": 0, "y": 24},
+      "datasource": {"type": "redis-datasource", "uid": "redis"},
+      "fieldConfig": {"defaults": {"unit": "short", "decimals": 2, "color": {"mode": "fixed", "fixedColor": "blue"}}, "overrides": []},
+      "options": {"xField": "Field", "orientation": "vertical", "fillOpacity": 80, "gradientMode": "none", "tooltip": {"mode": "single"}, "legend": {"displayMode": "list", "placement": "bottom", "showLegend": false}},
+      "transformations": [
+        {"id": "reduce", "options": {"reducers": ["last"], "labelsToFields": false}},
+        {"id": "organize", "options": {"renameByName": {"Last": "p25"}}}
+      ],
+      "targets": [{"datasource": {"type": "redis-datasource", "uid": "redis"}, "refId": "A", "command": "hgetall", "keyName": "q3:viz:WN:p25"}]
+    },
+    {
+      "id": 14, "title": "WN \u2014 p50 by Hour", "type": "barchart",
+      "gridPos": {"h": 8, "w": 6, "x": 6, "y": 24},
+      "datasource": {"type": "redis-datasource", "uid": "redis"},
+      "fieldConfig": {"defaults": {"unit": "short", "decimals": 2, "color": {"mode": "fixed", "fixedColor": "green"}}, "overrides": []},
+      "options": {"xField": "Field", "orientation": "vertical", "fillOpacity": 80, "gradientMode": "none", "tooltip": {"mode": "single"}, "legend": {"displayMode": "list", "placement": "bottom", "showLegend": false}},
+      "transformations": [
+        {"id": "reduce", "options": {"reducers": ["last"], "labelsToFields": false}},
+        {"id": "organize", "options": {"renameByName": {"Last": "p50"}}}
+      ],
+      "targets": [{"datasource": {"type": "redis-datasource", "uid": "redis"}, "refId": "A", "command": "hgetall", "keyName": "q3:viz:WN:p50"}]
+    },
+    {
+      "id": 15, "title": "WN \u2014 p75 by Hour", "type": "barchart",
+      "gridPos": {"h": 8, "w": 6, "x": 12, "y": 24},
+      "datasource": {"type": "redis-datasource", "uid": "redis"},
+      "fieldConfig": {"defaults": {"unit": "short", "decimals": 2, "color": {"mode": "fixed", "fixedColor": "orange"}}, "overrides": []},
+      "options": {"xField": "Field", "orientation": "vertical", "fillOpacity": 80, "gradientMode": "none", "tooltip": {"mode": "single"}, "legend": {"displayMode": "list", "placement": "bottom", "showLegend": false}},
+      "transformations": [
+        {"id": "reduce", "options": {"reducers": ["last"], "labelsToFields": false}},
+        {"id": "organize", "options": {"renameByName": {"Last": "p75"}}}
+      ],
+      "targets": [{"datasource": {"type": "redis-datasource", "uid": "redis"}, "refId": "A", "command": "hgetall", "keyName": "q3:viz:WN:p75"}]
+    },
+    {
+      "id": 16, "title": "WN \u2014 p90 by Hour", "type": "barchart",
+      "gridPos": {"h": 8, "w": 6, "x": 18, "y": 24},
+      "datasource": {"type": "redis-datasource", "uid": "redis"},
+      "fieldConfig": {"defaults": {"unit": "short", "decimals": 2, "color": {"mode": "fixed", "fixedColor": "red"}}, "overrides": []},
+      "options": {"xField": "Field", "orientation": "vertical", "fillOpacity": 80, "gradientMode": "none", "tooltip": {"mode": "single"}, "legend": {"displayMode": "list", "placement": "bottom", "showLegend": false}},
+      "transformations": [
+        {"id": "reduce", "options": {"reducers": ["last"], "labelsToFields": false}},
+        {"id": "organize", "options": {"renameByName": {"Last": "p90"}}}
+      ],
+      "targets": [{"datasource": {"type": "redis-datasource", "uid": "redis"}, "refId": "A", "command": "hgetall", "keyName": "q3:viz:WN:p90"}]
     }
+
   ]
 }

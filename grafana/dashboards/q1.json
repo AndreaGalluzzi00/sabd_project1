@@ -7,7 +7,7 @@
     "q1"
   ],
   "schemaVersion": 38,
-  "version": 3,
+  "version": 1,
   "refresh": false,
   "time": {
     "from": "now-1h",
@@ -20,8 +20,8 @@
     {
       "id": 1,
       "title": "Avg Departure Delay — AA (min)",
-      "description": "Media DEP_DELAY mensile (solo voli non cancellati) — American Airlines.",
-      "type": "barchart",
+      "description": "Ricavato dalle canoniche q1:AA:2025:{1..4} (HGET avg_dep_delay).",
+      "type": "bargauge",
       "gridPos": {
         "h": 11,
         "w": 12,
@@ -40,62 +40,73 @@
             "mode": "palette-classic"
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": { "id": "byFrameRefID", "options": "A" },
+            "properties": [ { "id": "displayName", "value": "Jan" } ]
+          },
+          {
+            "matcher": { "id": "byFrameRefID", "options": "B" },
+            "properties": [ { "id": "displayName", "value": "Feb" } ]
+          },
+          {
+            "matcher": { "id": "byFrameRefID", "options": "C" },
+            "properties": [ { "id": "displayName", "value": "Mar" } ]
+          },
+          {
+            "matcher": { "id": "byFrameRefID", "options": "D" },
+            "properties": [ { "id": "displayName", "value": "Apr" } ]
+          }
+        ]
       },
       "options": {
-        "xField": "Field",
-        "orientation": "auto",
-        "fillOpacity": 80,
-        "gradientMode": "none",
-        "groupWidth": 0.7,
-        "barWidth": 0.97,
-        "tooltip": {
-          "mode": "single",
-          "sort": "none"
+        "reduceOptions": {
+          "calcs": [ "lastNotNull" ],
+          "fields": "",
+          "values": false
         },
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": false
-        }
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "minVizWidth": 0,
+        "minVizHeight": 10
       },
-      "transformations": [
-        {
-          "id": "reduce",
-          "options": {
-            "reducers": [
-              "last"
-            ],
-            "labelsToFields": false
-          }
-        },
-        {
-          "id": "organize",
-          "options": {
-            "renameByName": {
-              "Last": "Avg Dep Delay",
-              "Field": "Month"
-            }
-          }
-        }
-      ],
       "targets": [
         {
-          "datasource": {
-            "type": "redis-datasource",
-            "uid": "redis"
-          },
+          "datasource": { "type": "redis-datasource", "uid": "redis" },
           "refId": "A",
-          "command": "hgetall",
-          "keyName": "q1:viz:AA:avg_dep_delay"
+          "command": "hget",
+          "keyName": "q1:AA:2025:1",
+          "field": "avg_dep_delay"
+        },
+        {
+          "datasource": { "type": "redis-datasource", "uid": "redis" },
+          "refId": "B",
+          "command": "hget",
+          "keyName": "q1:AA:2025:2",
+          "field": "avg_dep_delay"
+        },
+        {
+          "datasource": { "type": "redis-datasource", "uid": "redis" },
+          "refId": "C",
+          "command": "hget",
+          "keyName": "q1:AA:2025:3",
+          "field": "avg_dep_delay"
+        },
+        {
+          "datasource": { "type": "redis-datasource", "uid": "redis" },
+          "refId": "D",
+          "command": "hget",
+          "keyName": "q1:AA:2025:4",
+          "field": "avg_dep_delay"
         }
       ]
     },
     {
       "id": 2,
       "title": "Avg Departure Delay — DL (min)",
-      "description": "Media DEP_DELAY mensile (solo voli non cancellati) — Delta Air Lines.",
-      "type": "barchart",
+      "description": "Ricavato dalle canoniche q1:DL:2025:{1..4} (HGET avg_dep_delay).",
+      "type": "bargauge",
       "gridPos": {
         "h": 11,
         "w": 12,
@@ -114,62 +125,73 @@
             "mode": "palette-classic"
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": { "id": "byFrameRefID", "options": "A" },
+            "properties": [ { "id": "displayName", "value": "Jan" } ]
+          },
+          {
+            "matcher": { "id": "byFrameRefID", "options": "B" },
+            "properties": [ { "id": "displayName", "value": "Feb" } ]
+          },
+          {
+            "matcher": { "id": "byFrameRefID", "options": "C" },
+            "properties": [ { "id": "displayName", "value": "Mar" } ]
+          },
+          {
+            "matcher": { "id": "byFrameRefID", "options": "D" },
+            "properties": [ { "id": "displayName", "value": "Apr" } ]
+          }
+        ]
       },
       "options": {
-        "xField": "Field",
-        "orientation": "auto",
-        "fillOpacity": 80,
-        "gradientMode": "none",
-        "groupWidth": 0.7,
-        "barWidth": 0.97,
-        "tooltip": {
-          "mode": "single",
-          "sort": "none"
+        "reduceOptions": {
+          "calcs": [ "lastNotNull" ],
+          "fields": "",
+          "values": false
         },
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": false
-        }
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "minVizWidth": 0,
+        "minVizHeight": 10
       },
-      "transformations": [
-        {
-          "id": "reduce",
-          "options": {
-            "reducers": [
-              "last"
-            ],
-            "labelsToFields": false
-          }
-        },
-        {
-          "id": "organize",
-          "options": {
-            "renameByName": {
-              "Last": "Avg Dep Delay",
-              "Field": "Month"
-            }
-          }
-        }
-      ],
       "targets": [
         {
-          "datasource": {
-            "type": "redis-datasource",
-            "uid": "redis"
-          },
+          "datasource": { "type": "redis-datasource", "uid": "redis" },
           "refId": "A",
-          "command": "hgetall",
-          "keyName": "q1:viz:DL:avg_dep_delay"
+          "command": "hget",
+          "keyName": "q1:DL:2025:1",
+          "field": "avg_dep_delay"
+        },
+        {
+          "datasource": { "type": "redis-datasource", "uid": "redis" },
+          "refId": "B",
+          "command": "hget",
+          "keyName": "q1:DL:2025:2",
+          "field": "avg_dep_delay"
+        },
+        {
+          "datasource": { "type": "redis-datasource", "uid": "redis" },
+          "refId": "C",
+          "command": "hget",
+          "keyName": "q1:DL:2025:3",
+          "field": "avg_dep_delay"
+        },
+        {
+          "datasource": { "type": "redis-datasource", "uid": "redis" },
+          "refId": "D",
+          "command": "hget",
+          "keyName": "q1:DL:2025:4",
+          "field": "avg_dep_delay"
         }
       ]
     },
     {
       "id": 3,
       "title": "Cancellation Rate — AA (%)",
-      "description": "Percentuale voli cancellati sul totale per mese — American Airlines.",
-      "type": "barchart",
+      "description": "Ricavato dalle canoniche q1:AA:2025:{1..4} (HGET cancellation_rate_pct).",
+      "type": "bargauge",
       "gridPos": {
         "h": 11,
         "w": 12,
@@ -188,62 +210,73 @@
             "mode": "palette-classic"
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": { "id": "byFrameRefID", "options": "A" },
+            "properties": [ { "id": "displayName", "value": "Jan" } ]
+          },
+          {
+            "matcher": { "id": "byFrameRefID", "options": "B" },
+            "properties": [ { "id": "displayName", "value": "Feb" } ]
+          },
+          {
+            "matcher": { "id": "byFrameRefID", "options": "C" },
+            "properties": [ { "id": "displayName", "value": "Mar" } ]
+          },
+          {
+            "matcher": { "id": "byFrameRefID", "options": "D" },
+            "properties": [ { "id": "displayName", "value": "Apr" } ]
+          }
+        ]
       },
       "options": {
-        "xField": "Field",
-        "orientation": "auto",
-        "fillOpacity": 80,
-        "gradientMode": "none",
-        "groupWidth": 0.7,
-        "barWidth": 0.97,
-        "tooltip": {
-          "mode": "single",
-          "sort": "none"
+        "reduceOptions": {
+          "calcs": [ "lastNotNull" ],
+          "fields": "",
+          "values": false
         },
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": false
-        }
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "minVizWidth": 0,
+        "minVizHeight": 10
       },
-      "transformations": [
-        {
-          "id": "reduce",
-          "options": {
-            "reducers": [
-              "last"
-            ],
-            "labelsToFields": false
-          }
-        },
-        {
-          "id": "organize",
-          "options": {
-            "renameByName": {
-              "Last": "Cancellation Rate",
-              "Field": "Month"
-            }
-          }
-        }
-      ],
       "targets": [
         {
-          "datasource": {
-            "type": "redis-datasource",
-            "uid": "redis"
-          },
+          "datasource": { "type": "redis-datasource", "uid": "redis" },
           "refId": "A",
-          "command": "hgetall",
-          "keyName": "q1:viz:AA:cancellation_rate"
+          "command": "hget",
+          "keyName": "q1:AA:2025:1",
+          "field": "cancellation_rate_pct"
+        },
+        {
+          "datasource": { "type": "redis-datasource", "uid": "redis" },
+          "refId": "B",
+          "command": "hget",
+          "keyName": "q1:AA:2025:2",
+          "field": "cancellation_rate_pct"
+        },
+        {
+          "datasource": { "type": "redis-datasource", "uid": "redis" },
+          "refId": "C",
+          "command": "hget",
+          "keyName": "q1:AA:2025:3",
+          "field": "cancellation_rate_pct"
+        },
+        {
+          "datasource": { "type": "redis-datasource", "uid": "redis" },
+          "refId": "D",
+          "command": "hget",
+          "keyName": "q1:AA:2025:4",
+          "field": "cancellation_rate_pct"
         }
       ]
     },
     {
       "id": 4,
       "title": "Cancellation Rate — DL (%)",
-      "description": "Percentuale voli cancellati sul totale per mese — Delta Air Lines.",
-      "type": "barchart",
+      "description": "Ricavato dalle canoniche q1:DL:2025:{1..4} (HGET cancellation_rate_pct).",
+      "type": "bargauge",
       "gridPos": {
         "h": 11,
         "w": 12,
@@ -262,54 +295,65 @@
             "mode": "palette-classic"
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": { "id": "byFrameRefID", "options": "A" },
+            "properties": [ { "id": "displayName", "value": "Jan" } ]
+          },
+          {
+            "matcher": { "id": "byFrameRefID", "options": "B" },
+            "properties": [ { "id": "displayName", "value": "Feb" } ]
+          },
+          {
+            "matcher": { "id": "byFrameRefID", "options": "C" },
+            "properties": [ { "id": "displayName", "value": "Mar" } ]
+          },
+          {
+            "matcher": { "id": "byFrameRefID", "options": "D" },
+            "properties": [ { "id": "displayName", "value": "Apr" } ]
+          }
+        ]
       },
       "options": {
-        "xField": "Field",
-        "orientation": "auto",
-        "fillOpacity": 80,
-        "gradientMode": "none",
-        "groupWidth": 0.7,
-        "barWidth": 0.97,
-        "tooltip": {
-          "mode": "single",
-          "sort": "none"
+        "reduceOptions": {
+          "calcs": [ "lastNotNull" ],
+          "fields": "",
+          "values": false
         },
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": false
-        }
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "minVizWidth": 0,
+        "minVizHeight": 10
       },
-      "transformations": [
-        {
-          "id": "reduce",
-          "options": {
-            "reducers": [
-              "last"
-            ],
-            "labelsToFields": false
-          }
-        },
-        {
-          "id": "organize",
-          "options": {
-            "renameByName": {
-              "Last": "Cancellation Rate",
-              "Field": "Month"
-            }
-          }
-        }
-      ],
       "targets": [
         {
-          "datasource": {
-            "type": "redis-datasource",
-            "uid": "redis"
-          },
+          "datasource": { "type": "redis-datasource", "uid": "redis" },
           "refId": "A",
-          "command": "hgetall",
-          "keyName": "q1:viz:DL:cancellation_rate"
+          "command": "hget",
+          "keyName": "q1:DL:2025:1",
+          "field": "cancellation_rate_pct"
+        },
+        {
+          "datasource": { "type": "redis-datasource", "uid": "redis" },
+          "refId": "B",
+          "command": "hget",
+          "keyName": "q1:DL:2025:2",
+          "field": "cancellation_rate_pct"
+        },
+        {
+          "datasource": { "type": "redis-datasource", "uid": "redis" },
+          "refId": "C",
+          "command": "hget",
+          "keyName": "q1:DL:2025:3",
+          "field": "cancellation_rate_pct"
+        },
+        {
+          "datasource": { "type": "redis-datasource", "uid": "redis" },
+          "refId": "D",
+          "command": "hget",
+          "keyName": "q1:DL:2025:4",
+          "field": "cancellation_rate_pct"
         }
       ]
     }
