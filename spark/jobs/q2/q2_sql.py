@@ -31,12 +31,14 @@ t0 = time.time()
 
 # per arr_delay possiamo ignorare il valore null poichè presente solo se sono diverted o cancelled
 # per le componenti di ritardo conteggiamo nella media anche i null (settati a 0)
+
+# arr_delay non potrà mai essere null a causa del where su cancelled e diverted = 0
 result = spark.sql("""
     SELECT
         OP_UNIQUE_CARRIER,
-        COUNT(*)                                            AS num_flights,
-        ROUND(AVG(ARR_DELAY), 4)                           AS avg_arr_delay,
-        ROUND(AVG(COALESCE(CARRIER_DELAY,      0.0)), 4)   AS avg_carrier_delay,
+        COUNT(*)                                            AS num_flights, 
+        ROUND(AVG(ARR_DELAY), 4)                           AS avg_arr_delay,        
+        ROUND(AVG(COALESCE(CARRIER_DELAY,      0.0)), 4)   AS avg_carrier_delay,    
         ROUND(AVG(COALESCE(WEATHER_DELAY,      0.0)), 4)   AS avg_weather_delay,
         ROUND(AVG(COALESCE(NAS_DELAY,          0.0)), 4)   AS avg_nas_delay,
         ROUND(AVG(COALESCE(SECURITY_DELAY,     0.0)), 4)   AS avg_security_delay,
