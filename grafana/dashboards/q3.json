@@ -7,7 +7,7 @@
     "q3"
   ],
   "schemaVersion": 38,
-  "version": 2,
+  "version": 3,
   "refresh": false,
   "time": {
     "from": "now-1h",
@@ -40,10 +40,27 @@
             "mode": "palette-classic"
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": { "id": "byFrameRefID", "options": "A" },
+            "properties": [ { "id": "displayName", "value": "p25" } ]
+          },
+          {
+            "matcher": { "id": "byFrameRefID", "options": "B" },
+            "properties": [ { "id": "displayName", "value": "p50" } ]
+          },
+          {
+            "matcher": { "id": "byFrameRefID", "options": "C" },
+            "properties": [ { "id": "displayName", "value": "p75" } ]
+          },
+          {
+            "matcher": { "id": "byFrameRefID", "options": "D" },
+            "properties": [ { "id": "displayName", "value": "p90" } ]
+          }
+        ]
       },
       "options": {
-        "xField": "Field",
+        "xField": "Hour",
         "orientation": "auto",
         "fillOpacity": 80,
         "gradientMode": "none",
@@ -70,20 +87,9 @@
           }
         },
         {
-          "id": "joinByField",
-          "options": {
-            "byField": "Field",
-            "mode": "outer"
-          }
-        },
-        {
           "id": "organize",
           "options": {
             "renameByName": {
-              "Last": "p25",
-              "Last 1": "p50",
-              "Last 2": "p75",
-              "Last 3": "p90",
               "Field": "Hour"
             }
           }
@@ -151,10 +157,27 @@
             "mode": "palette-classic"
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": { "id": "byFrameRefID", "options": "A" },
+            "properties": [ { "id": "displayName", "value": "p25" } ]
+          },
+          {
+            "matcher": { "id": "byFrameRefID", "options": "B" },
+            "properties": [ { "id": "displayName", "value": "p50" } ]
+          },
+          {
+            "matcher": { "id": "byFrameRefID", "options": "C" },
+            "properties": [ { "id": "displayName", "value": "p75" } ]
+          },
+          {
+            "matcher": { "id": "byFrameRefID", "options": "D" },
+            "properties": [ { "id": "displayName", "value": "p90" } ]
+          }
+        ]
       },
       "options": {
-        "xField": "Field",
+        "xField": "Hour",
         "orientation": "auto",
         "fillOpacity": 80,
         "gradientMode": "none",
@@ -181,20 +204,9 @@
           }
         },
         {
-          "id": "joinByField",
-          "options": {
-            "byField": "Field",
-            "mode": "outer"
-          }
-        },
-        {
           "id": "organize",
           "options": {
             "renameByName": {
-              "Last": "p25",
-              "Last 1": "p50",
-              "Last 2": "p75",
-              "Last 3": "p90",
               "Field": "Hour"
             }
           }
@@ -262,10 +274,27 @@
             "mode": "palette-classic"
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": { "id": "byFrameRefID", "options": "A" },
+            "properties": [ { "id": "displayName", "value": "p25" } ]
+          },
+          {
+            "matcher": { "id": "byFrameRefID", "options": "B" },
+            "properties": [ { "id": "displayName", "value": "p50" } ]
+          },
+          {
+            "matcher": { "id": "byFrameRefID", "options": "C" },
+            "properties": [ { "id": "displayName", "value": "p75" } ]
+          },
+          {
+            "matcher": { "id": "byFrameRefID", "options": "D" },
+            "properties": [ { "id": "displayName", "value": "p90" } ]
+          }
+        ]
       },
       "options": {
-        "xField": "Field",
+        "xField": "Hour",
         "orientation": "auto",
         "fillOpacity": 80,
         "gradientMode": "none",
@@ -292,20 +321,9 @@
           }
         },
         {
-          "id": "joinByField",
-          "options": {
-            "byField": "Field",
-            "mode": "outer"
-          }
-        },
-        {
           "id": "organize",
           "options": {
             "renameByName": {
-              "Last": "p25",
-              "Last 1": "p50",
-              "Last 2": "p75",
-              "Last 3": "p90",
               "Field": "Hour"
             }
           }
@@ -373,10 +391,27 @@
             "mode": "palette-classic"
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": { "id": "byFrameRefID", "options": "A" },
+            "properties": [ { "id": "displayName", "value": "p25" } ]
+          },
+          {
+            "matcher": { "id": "byFrameRefID", "options": "B" },
+            "properties": [ { "id": "displayName", "value": "p50" } ]
+          },
+          {
+            "matcher": { "id": "byFrameRefID", "options": "C" },
+            "properties": [ { "id": "displayName", "value": "p75" } ]
+          },
+          {
+            "matcher": { "id": "byFrameRefID", "options": "D" },
+            "properties": [ { "id": "displayName", "value": "p90" } ]
+          }
+        ]
       },
       "options": {
-        "xField": "Field",
+        "xField": "Hour",
         "orientation": "auto",
         "fillOpacity": 80,
         "gradientMode": "none",
@@ -403,20 +438,9 @@
           }
         },
         {
-          "id": "joinByField",
-          "options": {
-            "byField": "Field",
-            "mode": "outer"
-          }
-        },
-        {
           "id": "organize",
           "options": {
             "renameByName": {
-              "Last": "p25",
-              "Last 1": "p50",
-              "Last 2": "p75",
-              "Last 3": "p90",
               "Field": "Hour"
             }
           }
