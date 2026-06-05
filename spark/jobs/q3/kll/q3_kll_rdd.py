@@ -63,6 +63,11 @@ def merge_combiners(b1: bytes, b2: bytes) -> bytes:
 def run(spark, benchmark=False):
     sc = spark.sparkContext
 
+    # Timer attorno a costruzione del piano + azione: sortBy/sortByKey NON sono lazy,
+    # lanciano un job di campionamento già in fase di definizione. Va quindi cronometrata
+    # anche la costruzione della pipeline, altrimenti la misura escluderebbe il lavoro vero.
+    t0 = time.time()
+
     df = (
         spark.read.parquet(HDFS_INPUT)
         .filter(
@@ -113,7 +118,6 @@ def run(spark, benchmark=False):
     percentile_rdd.cache()
     range_rdd.cache()
 
-    t0 = time.time()
     percentile_rows = percentile_rdd.collect()
     range_rows = range_rdd.collect()
     elapsed = time.time() - t0

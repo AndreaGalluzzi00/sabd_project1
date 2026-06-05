@@ -60,6 +60,11 @@ def quantiles(values_iter):
 def run(spark, benchmark=False):
     sc = spark.sparkContext
 
+    # Timer attorno a costruzione del piano + azione: sortBy/sortByKey NON sono lazy,
+    # lanciano un job di campionamento già in fase di definizione. Va quindi cronometrata
+    # anche la costruzione della pipeline, altrimenti la misura escluderebbe il lavoro vero.
+    t0 = time.time()
+
     #qui esplicitiamo il drop null su dep_delay nelle altre versioni no ma lo fa di default il percentile_approx
     df = (
         spark.read.parquet(HDFS_INPUT)
@@ -101,7 +106,6 @@ def run(spark, benchmark=False):
     percentile_rdd.cache()
     range_rdd.cache()
 
-    t0 = time.time()
     percentile_rows = percentile_rdd.collect()
     range_rows = [(c, mn, mx) for c, (mn, mx) in range_rdd.collect()]
     elapsed = time.time() - t0

@@ -23,6 +23,10 @@ os.makedirs(LOCAL_OUT, exist_ok=True)
 
 
 def run(spark, benchmark=False):
+    # Timer attorno a costruzione del piano + azione, per allineare la misura tra
+    # DataFrame/SQL/RDD (le versioni RDD lanciano un job "eager" già su sortBy/sortByKey).
+    t0 = time.time()
+
     df = (
         spark.read.parquet(HDFS_INPUT)
         .filter(
@@ -59,7 +63,6 @@ def run(spark, benchmark=False):
     percentiles.cache()
     delay_range.cache()
 
-    t0 = time.time()
     percentile_rows = percentiles.collect()
     range_rows = delay_range.collect()
     elapsed = time.time() - t0
