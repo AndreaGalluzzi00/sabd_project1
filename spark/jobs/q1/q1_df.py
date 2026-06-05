@@ -64,6 +64,7 @@ def run(spark, benchmark=False):
     elapsed = time.time() - t0
 
     if benchmark:
+        result.unpersist()
         return elapsed
 
     show_dataframe_result(result, "Q1", elapsed, 20)

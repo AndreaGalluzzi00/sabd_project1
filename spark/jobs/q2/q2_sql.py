@@ -54,6 +54,7 @@ def run(spark, benchmark=False):
     elapsed = time.time() - t0
 
     if benchmark:
+        result.unpersist()
         return elapsed
 
     # Output a schermo

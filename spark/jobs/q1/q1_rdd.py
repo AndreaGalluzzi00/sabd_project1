@@ -32,7 +32,7 @@ HEADER = [
 
 def to_key_value(r):
 
-    # Chiave di aggregazione, in previsione di reduceByKey
+    # Chive di aggregazione, in previsione di reduceByKey
     key = (r["OP_UNIQUE_CARRIER"], r["YEAR"], r["MONTH"])
 
     # Se il volo è cancellazione, allora conta su TUTTI i voli.
@@ -112,6 +112,7 @@ def run(spark, benchmark=False):
     elapsed = time.time() - t0
 
     if benchmark:
+        result_rdd.unpersist()
         return elapsed
 
     # (chiave, valore) -> riga piatta, ordinata per (carrier, year, month).
