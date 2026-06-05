@@ -91,52 +91,112 @@ def build_scaled_features(features_df, feature_cols):
     return prep_model.transform(features_df)
 
 
-# Elbow + Silhouette per k nel range
-def find_best_k(df_scaled, k_range, out_png_elbow):
-    evaluator = ClusteringEvaluator(featuresCol="features", predictionCol="prediction",
-                                    metricName="silhouette",
-                                    distanceMeasure="squaredEuclidean")
+def evaluate_k_values(df_scaled, k_range):
+    """
+    Esegue K-Means per ciascun valore di k e calcola WSSSE e silhouette.
+    """
+    evaluator = ClusteringEvaluator(
+        featuresCol="features",
+        predictionCol="prediction",
+        metricName="silhouette",
+        distanceMeasure="squaredEuclidean",
+    )
 
-    k_values        = list(k_range)
-    wssse_list      = []
+    k_values = list(k_range)
+    wssse_list = []
     silhouette_list = []
 
     print(f"\nRicerca k ottimale (range {k_values}):")
+
     for k in k_values:
-        km    = KMeans(featuresCol="features", k=k, seed=42, maxIter=100, initSteps=10)
+        km = KMeans(
+            featuresCol="features",
+            k=k,
+            seed=42,
+            maxIter=100,
+            initSteps=10,
+        )
+
         model = km.fit(df_scaled)
         preds = model.transform(df_scaled)
-        wssse = model.summary.trainingCost
-        sil   = evaluator.evaluate(preds)
-        wssse_list.append(wssse)
-        silhouette_list.append(sil)
-        print(f"  k={k}  WSSSE={wssse:.4f}  Silhouette={sil:.4f}")
 
+        wssse = model.summary.trainingCost
+        silhouette = evaluator.evaluate(preds)
+
+        wssse_list.append(wssse)
+        silhouette_list.append(silhouette)
+
+        print(f"  k={k}  WSSSE={wssse:.4f}  Silhouette={silhouette:.4f}")
+
+    return k_values, wssse_list, silhouette_list
+
+
+
+def select_best_k(k_values, silhouette_list):
+    """
+    Seleziona il valore di k che massimizza il silhouette score.
+    """
+    best_index = silhouette_list.index(max(silhouette_list))
+    best_k = k_values[best_index]
+
+    print(f"k ottimale (max silhouette={silhouette_list[best_index]:.4f}): "
+          f"k={best_k}")
+
+    return best_k
+
+
+def plot_k_metrics(k_values, wssse_list, silhouette_list, out_png):
+    """
+    Genera il grafico con elbow method e silhouette score.
+    """
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4))
 
+    # Elbow method - WSSSE
     ax1.plot(k_values, wssse_list, "bo-", markersize=7)
     ax1.set_xlabel("k")
     ax1.set_ylabel("WSSSE")
     ax1.set_title("Elbow Method — WSSSE")
     ax1.grid(True, alpha=0.3)
-    for x, y in zip(k_values, wssse_list):
-        ax1.annotate(f"{y:.1f}", (x, y), textcoords="offset points", xytext=(4, 4), fontsize=8)
 
+    for x, y in zip(k_values, wssse_list):
+        ax1.annotate(
+            f"{y:.1f}",
+            (x, y),
+            textcoords="offset points",
+            xytext=(4, 4),
+            fontsize=8,
+        )
+
+    # Silhouette score
     ax2.plot(k_values, silhouette_list, "rs-", markersize=7)
     ax2.set_xlabel("k")
     ax2.set_ylabel("Silhouette Score")
-    ax2.set_title("Silhouette Score (ClusteringEvaluator) per k")
+    ax2.set_title("Silhouette Score per k")
     ax2.grid(True, alpha=0.3)
+
     for x, y in zip(k_values, silhouette_list):
-        ax2.annotate(f"{y:.3f}", (x, y), textcoords="offset points", xytext=(4, 4), fontsize=8)
+        ax2.annotate(
+            f"{y:.3f}",
+            (x, y),
+            textcoords="offset points",
+            xytext=(4, 4),
+            fontsize=8,
+        )
 
     plt.tight_layout()
-    plt.savefig(out_png_elbow, dpi=150, bbox_inches="tight")
+    plt.savefig(out_png, dpi=150, bbox_inches="tight")
     plt.close()
-    print(f"\nElbow/Silhouette plot: {out_png_elbow}")
 
-    best_k = k_values[silhouette_list.index(max(silhouette_list))]
-    print(f"k ottimale (max silhouette={max(silhouette_list):.4f}): k={best_k}")
+    print(f"\nElbow/Silhouette plot: {out_png}")
+
+# Elbow + Silhouette per k nel range
+def find_best_k(df_scaled, k_range, out_png_elbow):
+
+    k_values, wssse_list, silhouette_list = evaluate_k_values(df_scaled,k_range)
+
+    plot_k_metrics(k_values,wssse_list,silhouette_list,out_png_elbow)
+
+    best_k = select_best_k(k_values,silhouette_list)
 
     return best_k, k_values, wssse_list, silhouette_list
 
@@ -196,16 +256,6 @@ def pca_scatter_plot(df_scaled, df_result, best_k, out_png_pca, label=""):
 
 # Profiling dei cluster: heatmap z-score + tabella delta
 def profile_clusters(features_df, df_result, feature_cols, best_k, out_png, out_csv):
-    """Interpretazione dei cluster (deliverable della traccia).
-
-    - heatmap z-score: per ogni cluster, scarto del centroide dalla media globale
-      diviso la deviazione standard globale (in σ) -> evidenzia cosa caratterizza
-      ciascun gruppo;
-    - tabella delta (CSV + stampa): media per cluster in unità originali, delta
-      vs media globale e z-score per ogni feature.
-    Statistiche globali calcolate sui carrier selezionati (un punto per carrier,
-    coerente con lo spazio del clustering).
-    """
     g = features_df.select(
         *[spark_mean(c).alias(f"{c}__mean") for c in feature_cols],
         *[stddev(c).alias(f"{c}__std") for c in feature_cols],
@@ -267,87 +317,121 @@ def profile_clusters(features_df, df_result, feature_cols, best_k, out_png, out_
               + " | ".join(f"{delta[i, j]:>+10.2f}" for j in range(len(feature_cols))))
 
 
-#(extended) Correlation clustermap + verdetto feature aggiunte
-def correlation_clustermap(features_df, feature_cols, base_cols, extra_cols,
-                           out_png, out_csv, redundancy_threshold=0.8):
-    """Matrice di correlazione di Pearson (feature x feature) con ordinamento
-    gerarchico (clustermap). Le feature aggiunte sono evidenziate (etichette in
-    rosso/grassetto) e per ognuna viene prodotto un verdetto KEEP/REDUNDANT in
-    base alla massima |r| rispetto alle feature base.
-    """
+
+
+def build_feature_matrix(features_df, feature_cols):
+
     rows = features_df.select(*feature_cols).collect()
-    M = np.array([[r[c] for c in feature_cols] for r in rows], dtype=float)  # (n_carriers, n_feat)
-    M = np.nan_to_num(M, nan=0.0)
-    corr = np.nan_to_num(np.corrcoef(M, rowvar=False), nan=0.0)
 
-    # ordinamento gerarchico su distanza = 1 - |corr| (scipy, già presente)
-    try:
-        from scipy.cluster.hierarchy import linkage, leaves_list
-        from scipy.spatial.distance import squareform
-        dist = 1.0 - np.abs(corr)
-        np.fill_diagonal(dist, 0.0)
-        dist = (dist + dist.T) / 2.0
-        order = list(leaves_list(linkage(squareform(dist, checks=False), method="average")))
-    except Exception as e:  # pragma: no cover - fallback difensivo
-        print(f"[clustermap] ordinamento gerarchico non disponibile ({e}); uso ordine originale")
-        order = list(range(len(feature_cols)))
+    matrix = np.array(
+        [[r[c] for c in feature_cols] for r in rows],
+        dtype=float
+    )
 
-    ordered  = [feature_cols[i] for i in order]
-    corr_ord = corr[np.ix_(order, order)]
-    extra_set = set(extra_cols)
+    return np.nan_to_num(matrix, nan=0.0)
+def compute_correlation_matrix(feature_matrix):
 
-    fig, ax = plt.subplots(figsize=(len(feature_cols) * 0.85 + 2, len(feature_cols) * 0.85 + 2))
-    im = ax.imshow(corr_ord, cmap="RdBu_r", vmin=-1, vmax=1, aspect="auto")
-    ax.set_xticks(range(len(ordered)))
-    ax.set_yticks(range(len(ordered)))
-    ax.set_xticklabels(ordered, rotation=45, ha="right", fontsize=8)
-    ax.set_yticklabels(ordered, fontsize=8)
-    for tick, name in zip(ax.get_xticklabels() + ax.get_yticklabels(), ordered * 2):
-        if name in extra_set:
-            tick.set_color("#b30000")
-            tick.set_fontweight("bold")
-    for i in range(len(ordered)):
-        for j in range(len(ordered)):
-            ax.text(j, i, f"{corr_ord[i, j]:.2f}", ha="center", va="center", fontsize=6)
-    fig.colorbar(im, ax=ax, label="Correlazione di Pearson")
-    ax.set_title("Correlation clustermap — feature aggiunte (in rosso) vs base")
-    plt.tight_layout()
-    plt.savefig(out_png, dpi=150, bbox_inches="tight")
-    plt.close()
-    print(f"Correlation clustermap: {out_png}")
+    corr = np.corrcoef(feature_matrix, rowvar=False)
+    return np.nan_to_num(corr, nan=0.0)
 
-    # --- verdetto per ciascuna feature aggiunta ---
+
+def find_redundant_extra_features(corr, feature_cols, extra_cols, redundancy_threshold):
+
     idx = {c: i for i, c in enumerate(feature_cols)}
     features_to_remove = []
+    report_rows = []
 
     print(f"\nGiustificazione feature aggiunte (soglia ridondanza |r| >= {redundancy_threshold}):")
+
+    for e in extra_cols:
+        corrs = {
+            c: float(corr[idx[e], idx[c]])
+            for c in feature_cols
+            if c != e
+        }
+
+        best_c = max(corrs, key=lambda c: abs(corrs[c]))
+        max_abs = abs(corrs[best_c])
+
+        verdict = "REDUNDANT" if max_abs >= redundancy_threshold else "KEEP"
+
+        if verdict == "REDUNDANT":
+            features_to_remove.append(e)
+
+        print(f"  {e:18s} -> {best_c:18s} |r|={max_abs:.2f}  => {verdict}")
+
+        report_rows.append({
+            "extra_feature": e,
+            "best_correlate": best_c,
+            "max_abs_corr": round(max_abs, 4),
+            "verdict": verdict,
+            "corr_values": {
+                c: round(float(corr[idx[e], idx[c]]), 4)
+                for c in feature_cols
+            }
+        })
+
+    return features_to_remove, report_rows
+
+def export_correlation_report(report_rows, feature_cols, out_csv):
+
     with open(out_csv, "w", newline="") as f:
         w = csv.writer(f)
-        w.writerow(["extra_feature", "best_base_correlate", "max_abs_corr", "verdict"]
-                   + [f"corr_{b}" for b in base_cols])
 
-        for e in extra_cols:
-            corrs = {b: float(corr[idx[e], idx[b]]) for b in base_cols}
-            best_b = max(base_cols, key=lambda b: abs(corrs[b]))
-            max_abs = abs(corrs[best_b])
-            verdict = "REDUNDANT" if max_abs >= redundancy_threshold else "KEEP"
+        w.writerow(
+            ["extra_feature", "best_correlate", "max_abs_corr", "verdict"]
+            + [f"corr_{c}" for c in feature_cols]
+        )
 
-            if verdict == "REDUNDANT":
-                features_to_remove.append(e)
+        for row in report_rows:
+            w.writerow(
+                [
+                    row["extra_feature"],
+                    row["best_correlate"],
+                    row["max_abs_corr"],
+                    row["verdict"],
+                ]
+                + [row["corr_values"][c] for c in feature_cols]
+            )
 
-            print(f"  {e:18s} -> {best_b:18s} |r|={max_abs:.2f}  => {verdict}")
-            w.writerow([e, best_b, round(max_abs, 4), verdict]
-                       + [round(corrs[b], 4) for b in base_cols])
+    print(f"Correlation summary CSV: {out_csv}")
 
-    print(f"Correlation summary: {out_csv}")
+
+def correlation_feature_selection(features_df,feature_cols,extra_cols,out_csv):
+
+    rows = features_df.select(*feature_cols).collect()
+
+    feature_matrix = np.array(
+        [[r[c] for c in feature_cols] for r in rows],
+        dtype=float
+    )
+
+    feature_matrix = np.nan_to_num(feature_matrix, nan=0.0)
+
+    corr = np.nan_to_num(
+        np.corrcoef(feature_matrix, rowvar=False),
+        nan=0.0
+    )
+
+    features_to_remove, report_rows = find_redundant_extra_features(
+        corr,
+        feature_cols,
+        extra_cols,
+        redundancy_threshold=0.8
+    )
+
+    export_correlation_report(
+        report_rows,
+        feature_cols,
+        out_csv
+    )
 
     return features_to_remove
 
 
+
+
 def remove_features(feature_cols, features_to_remove):
-    """
-    Rimuove da feature_cols le feature presenti in features_to_remove.
-    """
 
     if not features_to_remove:
         print("\nNessuna feature ridondante da rimuovere.")
@@ -364,6 +448,7 @@ def remove_features(feature_cols, features_to_remove):
         print(f"  - {c}")
 
     return filtered_cols
+
 
 # Metriche per il confronto base vs extended
 def export_k_metrics(k_values, wssse_list, silhouette_list, local_csv):

@@ -1,4 +1,4 @@
-extra_feature,best_base_correlate,max_abs_corr,verdict,corr_avg_dep_delay,corr_avg_arr_delay,corr_cancellation_rate,corr_avg_carrier_delay,corr_avg_weather_delay,corr_avg_nas_delay,corr_avg_security_delay,corr_avg_late_aircraft
-std_dep_delay,avg_dep_delay,0.9159,REDUNDANT,0.9159,0.8919,0.4361,0.8166,0.6105,0.2753,0.3515,0.7936
-on_time_rate,avg_late_aircraft,0.4125,KEEP,-0.3871,-0.3475,0.023,-0.1335,0.2192,0.392,-0.1786,-0.4125
-diverted_rate,avg_weather_delay,0.5187,KEEP,0.3148,0.2567,0.0488,0.4271,0.5187,0.0527,0.148,0.1937
+extra_feature,best_correlate,max_abs_corr,verdict,corr_avg_dep_delay,corr_avg_arr_delay,corr_cancellation_rate,corr_avg_carrier_delay,corr_avg_weather_delay,corr_avg_nas_delay,corr_avg_security_delay,corr_avg_late_aircraft,corr_std_dep_delay,corr_on_time_rate,corr_diverted_rate
+std_dep_delay,avg_dep_delay,0.9159,REDUNDANT,0.9159,0.8919,0.4361,0.8166,0.6105,0.2753,0.3515,0.7936,1.0,-0.1428,0.3602
+on_time_rate,avg_late_aircraft,0.4125,KEEP,-0.3871,-0.3475,0.023,-0.1335,0.2192,0.392,-0.1786,-0.4125,-0.1428,1.0,0.036
+diverted_rate,avg_weather_delay,0.5187,KEEP,0.3148,0.2567,0.0488,0.4271,0.5187,0.0527,0.148,0.1937,0.3602,0.036,1.0

@@ -57,7 +57,6 @@ STUDIES = [
         "out_png_profile": f"{RESULTS_DIR}/clustering_base_profile.png",
         "run_correlation": False,
         "out_corr_csv": None,
-        "out_png_corr": None,
     },
     {
         "name": "extended",
@@ -72,7 +71,6 @@ STUDIES = [
         "out_png_profile": f"{RESULTS_DIR}/clustering_extended_profile.png",
         "run_correlation": True,
         "out_corr_csv": f"{RESULTS_DIR}/clustering_extended_corr.csv",
-        "out_png_corr": f"{RESULTS_DIR}/clustering_extended_corr.png",
     },
 ]
 
@@ -96,7 +94,12 @@ def run_study(df, study):
 
     # 1b. Feature selection tramite correlazione
     if study["run_correlation"]:
-        features_to_remove = uc.correlation_clustermap(features_df,feature_cols,BASE_COLS,EXTRA_COLS,study["out_png_corr"],study["out_corr_csv"])
+        features_to_remove = uc.correlation_feature_selection(
+            features_df,
+            feature_cols,
+            EXTRA_COLS,
+            study["out_corr_csv"]
+        )
         feature_cols = uc.remove_features(feature_cols,features_to_remove)
 
     # 2. Scaling
