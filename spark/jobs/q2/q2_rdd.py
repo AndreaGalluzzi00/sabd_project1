@@ -82,8 +82,8 @@ def finalize(v):
     avg_arr = round(arr_sum / arr_n, 4) if arr_n > 0 else None
     avg_carrier = round(carrier / arr_n, 4) if arr_n > 0 else None
     avg_weather = round(weather / arr_n, 4) if arr_n > 0 else None
-    avg_nas = round(nas / arr_n, 4) if total > 0 else None
-    avg_security = round(security / arr_n, 4) if total > 0 else None
+    avg_nas = round(nas / arr_n, 4) if arr_n > 0 else None
+    avg_security = round(security / arr_n, 4) if arr_n > 0 else None
     avg_late_aircraft = round(late / arr_n, 4) if arr_n > 0 else None
 
     return (
