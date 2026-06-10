@@ -74,10 +74,12 @@ def run(spark, benchmark=False):
         .dropna(subset=["DEP_DELAY"])
     )
 
-    rdd = df.rdd.map(lambda row: (
-        (row.OP_UNIQUE_CARRIER, int(row.hour)),
-        float(row.DEP_DELAY)
+    rdd = df.rdd.map(lambda r: (
+        r["OP_UNIQUE_CARRIER"],
+        int(r["hour"]),
+        float(r["DEP_DELAY"])
     ))
+
     rdd = rdd.cache()
     t0 = time.time()
 
@@ -90,25 +92,26 @@ def run(spark, benchmark=False):
     # la struttura qui è ((carrier, hour ), tdigest_finale)
     percentile_rdd = (
         rdd
+        .map(lambda t: ((t[0], t[1]), t[2]))
         .combineByKey(create_combiner, merge_value, merge_combiners)
+        .sortByKey()
         .map(lambda kv: (
-            kv[0][0],                            # carrier
-            kv[0][1],                            # hour
-            round(kv[1].percentile(25), 2),      # p25
-            round(kv[1].percentile(50), 2),      # p50
-            round(kv[1].percentile(75), 2),      # p75
-            round(kv[1].percentile(90), 2),      # p90
+            kv[0][0],
+            kv[0][1],
+            round(kv[1].percentile(25), 2),
+            round(kv[1].percentile(50), 2),
+            round(kv[1].percentile(75), 2),
+            round(kv[1].percentile(90), 2),
         ))
-        .sortBy(lambda x: (x[0], x[1]))
     )
 
     # Min/Max: operazioni esatte, calcolate su DataFrame (no approssimazione)
     range_rdd = (
         rdd
-        .map(lambda kv: (kv[0][0], (kv[1], kv[1])))
+        .map(lambda t: (t[0], (t[2], t[2])))
         .reduceByKey(lambda a, b: (min(a[0], b[0]), max(a[1], b[1])))
+        .sortByKey()
         .map(lambda kv: (kv[0], kv[1][0], kv[1][1]))
-        .sortBy(lambda x: x[0])
     )
 
     # Caching dei risultati per evitare ricalcolo durante il salvataggio HDFS

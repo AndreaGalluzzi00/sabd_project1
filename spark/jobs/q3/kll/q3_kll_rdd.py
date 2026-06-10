@@ -58,6 +58,18 @@ def merge_combiners(b1: bytes, b2: bytes) -> bytes:
     s2 = datasketches.kll_floats_sketch.deserialize(b2)
     s1.merge(s2)
     return s1.serialize()
+def extract_kll_percentiles(kv):
+    (carrier, hour), sketch_bytes = kv
+    sketch = datasketches.kll_floats_sketch.deserialize(sketch_bytes)
+
+    return (
+        carrier,
+        hour,
+        round(sketch.get_quantile(0.25), 2),
+        round(sketch.get_quantile(0.50), 2),
+        round(sketch.get_quantile(0.75), 2),
+        round(sketch.get_quantile(0.90), 2),
+    )
 
 
 def run(spark, benchmark=False):
@@ -79,9 +91,10 @@ def run(spark, benchmark=False):
         .dropna(subset=["DEP_DELAY"])
     )
 
-    rdd = df.rdd.map(lambda row: (
-        (row.OP_UNIQUE_CARRIER, int(row.hour)),
-        float(row.DEP_DELAY)
+    rdd = df.rdd.map(lambda r: (
+        r["OP_UNIQUE_CARRIER"],
+        int(r["hour"]),
+        float(r["DEP_DELAY"])
     ))
 
     # cache della sorgente: riusata da percentili e min/max (coerente con q3_rdd);
@@ -91,27 +104,20 @@ def run(spark, benchmark=False):
     # Percentili via RDD + KLL sketch
     percentile_rdd = (
         rdd
+        .map(lambda t: ((t[0], t[1]), t[2]))
         .combineByKey(create_combiner, merge_value, merge_combiners)
-        .map(lambda kv: (
-            kv[0][0],                                                          # carrier
-            kv[0][1],                                                          # hour
-            # analogo a tdigest con l'aggiunta della deserialize
-            round(datasketches.kll_floats_sketch.deserialize(kv[1]).get_quantile(0.25), 2),  # p25
-            round(datasketches.kll_floats_sketch.deserialize(kv[1]).get_quantile(0.50), 2),  # p50
-            round(datasketches.kll_floats_sketch.deserialize(kv[1]).get_quantile(0.75), 2),  # p75
-            round(datasketches.kll_floats_sketch.deserialize(kv[1]).get_quantile(0.90), 2),  # p90
-        ))
-        .sortBy(lambda x: (x[0], x[1]))
+        .sortByKey()
+        .map(extract_kll_percentiles)
+
     )
 
-    # Min/Max: operazioni esatte, calcolate su DataFrame (no approssimazione)
     # Min/Max DEP_DELAY per compagnia, calcolato con RDD.
     range_rdd = (
         rdd
-        .map(lambda kv: (kv[0][0], (kv[1], kv[1])))
+        .map(lambda t: (t[0], (t[2], t[2])))
         .reduceByKey(lambda a, b: (min(a[0], b[0]), max(a[1], b[1])))
+        .sortByKey()
         .map(lambda kv: (kv[0], kv[1][0], kv[1][1]))
-        .sortBy(lambda x: x[0])
     )
 
     # Caching dei risultati per evitare ricalcolo durante il salvataggio HDFS

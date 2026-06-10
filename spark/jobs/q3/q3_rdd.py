@@ -60,9 +60,10 @@ def quantiles(values_iter):
 def run(spark, benchmark=False):
     sc = spark.sparkContext
 
-    # Timer attorno a costruzione del piano + azione: sortBy/sortByKey NON sono lazy,
-    # lanciano un job di campionamento già in fase di definizione. Va quindi cronometrata
-    # anche la costruzione della pipeline, altrimenti la misura escluderebbe il lavoro vero.
+    # Timer attorno alla costruzione delle pipeline RDD e alle action.
+    # In PySpark sortBy/sortByKey possono avviare un job preliminare di campionamento
+    # per determinare il partizionamento ordinato; per questo il timer parte prima
+    # della definizione delle pipeline ordinate.
 
 
     #qui esplicitiamo il drop null su dep_delay nelle altre versioni no ma lo fa di default il percentile_approx
@@ -78,8 +79,11 @@ def run(spark, benchmark=False):
     )
 
     # Base RDD (carrier, hour, delay) riusato per percentili e min/max.
-    base = df.rdd.map(lambda r: (r["OP_UNIQUE_CARRIER"], int(r["hour"]), float(r["DEP_DELAY"])))
-
+    base = df.rdd.map(lambda r: (
+        r["OP_UNIQUE_CARRIER"],
+        int(r["hour"]),
+        float(r["DEP_DELAY"])
+    ))
     # cache() per evitare di rileggere i dati due volte (percentili + range);
     # attivo anche in benchmark per misurare lo stesso path della produzione
     base = base.cache()
@@ -87,27 +91,25 @@ def run(spark, benchmark=False):
     # Percentili: groupByKey per (carrier, hour) calcolo esatto sul gruppo ordinato.
     percentile_rdd = (
         base
-        .map(lambda t: ((t[0], t[1]), t[2]))               # chiave = (carrier, hour) valore = delay
-        .groupByKey()                                       # raggruppa per (carrier, hour)
-        .mapValues(quantiles)                               # calcola percentili sul gruppo solo sui valori, chiavi intatte
-        .map(lambda kv: (kv[0][0], kv[0][1], *kv[1]))      # appiattisce il risultato
-        .sortBy(lambda x: (x[0], x[1]))
+        .map(lambda t: ((t[0], t[1]), t[2]))
+        .groupByKey()
+        .mapValues(quantiles)
+        .sortByKey()
+        .map(lambda kv: (kv[0][0], kv[0][1], *kv[1]))
     )
-
-    # Min/Max DEP_DELAY per compagnia.
     range_rdd = (
         base
-        .map(lambda t: (t[0], (t[2], t[2])))  # chiave solo carrier value = (ritardo, ritardo)
-        .reduceByKey(lambda a, b: (min(a[0], b[0]), max(a[1], b[1]))) # calcolo effettivo del minimo e massimo sulle coppie
-        .sortByKey() # qui ottieni quindi (carrier, (min,max))
+        .map(lambda t: (t[0], (t[2], t[2])))
+        .reduceByKey(lambda a, b: (min(a[0], b[0]), max(a[1], b[1])))
+        .sortByKey()
+        .map(lambda kv: (kv[0], kv[1][0], kv[1][1]))
     )
 
     # Caching dei risultati per evitare ricalcolo durante il salvataggio HDFS
     percentile_rdd.cache()
     range_rdd.cache()
-
     percentile_rows = percentile_rdd.collect()
-    range_rows = [(c, mn, mx) for c, (mn, mx) in range_rdd.collect()]
+    range_rows = range_rdd.collect()
     elapsed = time.time() - t0
 
     if benchmark:
@@ -147,7 +149,7 @@ def run(spark, benchmark=False):
         path=HDFS_OUTPUT_PERCENTILES,
         header=COLS_PERC,
         data_rdd=percentile_rdd,
-        row_mapper=lambda row: row, #appiattisce come fatto prima ma per rdd sul cluster
+        row_mapper=lambda row: row,
     )
 
     save_rdd_csv_hdfs(
@@ -155,11 +157,7 @@ def run(spark, benchmark=False):
         path=HDFS_OUTPUT_RANGE,
         header=COLS_RANGE,
         data_rdd=range_rdd,
-        row_mapper=lambda kv: [
-            kv[0],
-            kv[1][0],
-            kv[1][1],
-        ],
+        row_mapper=lambda row: row,
     )
 
     print(f"\nTempo Q3 query/calcolo (RDD, esatto): {elapsed:.2f}s")
